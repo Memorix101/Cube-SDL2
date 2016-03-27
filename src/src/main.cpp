@@ -145,7 +145,7 @@ int main(int argc, char **argv)
 
     log("video: misc");
 	//SDL_WM_SetCaption("cube engine", NULL);
-	SDL_SetWindowTitle(mainWindow, "Cube SDL2 Meep");
+	SDL_SetWindowTitle(mainWindow, "Cube SDL2");
    // SDL_WM_GrabInput(SDL_GRAB_ON);
 	SDL_SetRelativeMouseMode(SDL_TRUE);
     keyrepeat(false);
