@@ -232,18 +232,21 @@ void addstrip(int tex, int start, int n)
     s.num = n;
 };
 
+
 /*
 VARFP(gamma, 30, 100, 300,
 {
-    float f = gamma/100.0f;
-    if(SDL_SetGamma(f,f,f)==-1)
+    int f = gamma/100;
+   
+if(SDL_SetWindowGammaRamp(mainWindow, f,f,f) == -1)
     {
         conoutf("Could not set gamma (card/driver doesn't support it?)");
         conoutf("sdl: %s", SDL_GetError());
     };
+	
 });
-
 */
+
 
 void transplayer()
 {

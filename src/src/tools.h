@@ -3,15 +3,19 @@
 #ifndef _TOOLS_H
 #define _TOOLS_H
 
+/*
 #ifdef __GNUC__
 #define gamma __gamma
 #endif
+*/
 
 #include <math.h>
 
+/*
 #ifdef __GNUC__
 #undef gamma
 #endif
+*/
 
 #include <string.h>
 #include <stdio.h>
@@ -276,4 +280,3 @@ inline char *newstring(char *s, size_t l) { return gp()->string(s, l); };
 inline char *newstringbuf(char *s)     { return gp()->stringbuf(s); };
 
 #endif
-

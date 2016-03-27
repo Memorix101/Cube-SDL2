@@ -122,6 +122,11 @@ int main(int argc, char **argv)
    // fs = 0;
     #endif
 
+   //Use OpenGL 3.1 core
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+
     if(SDL_Init(SDL_INIT_TIMER|SDL_INIT_VIDEO|par)<0) fatal("Unable to initialize SDL");
     SDL_Window *mainWindow = SDL_CreateWindow("Cube SDL2 ", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, scr_w, scr_h, fs | SDL_WINDOW_OPENGL);
 
@@ -134,7 +139,6 @@ int main(int argc, char **argv)
     log("world");
     empty_world(7, true);
 
-	SDL_version linked;
     log("video: sdl 2");
     if(SDL_InitSubSystem(SDL_INIT_VIDEO)<0) fatal("Unable to initialize SDL Video");
 

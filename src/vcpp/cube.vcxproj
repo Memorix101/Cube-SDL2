@@ -66,8 +66,8 @@
     <OutDir>..\..\bin</OutDir>
     <IntDir>.\Debug\</IntDir>
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Users\memor\Desktop\Cube\src\enet\include;C:\Users\memor\Desktop\Cube\src\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\memor\Desktop\Cube\src\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\memor\Documents\GitHub\Cube-SDL2\src\enet\include;C:\Users\memor\Documents\GitHub\Cube-SDL2\src\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\memor\Documents\GitHub\Cube-SDL2\src\lib;$(LibraryPath)</LibraryPath>
     <TargetName>cubed</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|Win32'">
@@ -147,7 +147,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/MACHINE:I386 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>odbc32.lib;odbccp32.lib;zlib.lib;opengl32.lib;glu32.lib;msvcrt.lib;SDL2main.lib;SDL2.lib;SDL2_image.lib;SDL2_mixer.lib;ws2_32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>odbc32.lib;odbccp32.lib;zlib.lib;opengl32.lib;glu32.lib;msvcrt.lib;SDL2main.lib;SDL2.lib;SDL2_image.lib;SDL2_mixer.lib;ws2_32.lib;winmm.lib;glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>C:\w\cube\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
