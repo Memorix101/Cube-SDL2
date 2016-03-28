@@ -1,7 +1,7 @@
 # Cube-SDL2
 SDL2 port of Cube Engine http://cubeengine.com/cube.php
 
-In this version we tried implementing shaders, but's not working (yet).
+In this version we (@Hyatukate and me) tried implementing shaders, but's not working (yet).
 Also I tried to save the maps without the zlib compression to make them
 readable in a text editor
 
