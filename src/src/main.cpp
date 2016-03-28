@@ -88,6 +88,8 @@ int framesinmap = 0;
 
 int main(int argc, char **argv)
 {    
+
+
     bool dedicated = false;
     int fs = SDL_WINDOW_FULLSCREEN, par = 0, uprate = 0, maxcl = 4;
 
@@ -95,6 +97,13 @@ int main(int argc, char **argv)
     islittleendian = *((char *)&islittleendian);
 
     #define log(s) conoutf("init: %s", s)
+
+#ifdef _DEBUG
+
+	log("DEBUG VERSION RUNNING !");
+#endif
+
+
     log("sdl");
     
     for(int i = 1; i<argc; i++)
@@ -127,8 +136,54 @@ int main(int argc, char **argv)
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
+
     if(SDL_Init(SDL_INIT_TIMER|SDL_INIT_VIDEO|par)<0) fatal("Unable to initialize SDL");
     SDL_Window *mainWindow = SDL_CreateWindow("Cube SDL2 ", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, scr_w, scr_h, fs | SDL_WINDOW_OPENGL);
+	SDL_GL_CreateContext(mainWindow);
+
+
+	//Initialize GLEW
+	glewExperimental = GL_TRUE;
+	GLenum glewError = glewInit();
+	if (glewError != GLEW_OK)
+	{
+		printf("Error initializing GLEW! %s\n", glewGetErrorString(glewError));
+	}
+
+
+#ifdef _DEBUG
+
+	log("GLEW TEST");
+
+	if (glewIsSupported("GL_VERSION_1_4"))
+	{
+		/* Great, we have OpenGL 1.4 + point sprites. */
+		log("OpenGL 1.4 is supported");
+	}
+
+	if (glewIsSupported("GL_VERSION_3_0"))
+	{
+		/* Great, we have OpenGL 1.4 + point sprites. */
+		log("OpenGL 3.0 is supported");
+	}
+
+	if (glewIsSupported("GL_VERSION_4_0"))
+	{
+		/* Great, we have OpenGL 1.4 + point sprites. */
+		log("OpenGL 4.0 is supported");
+	}
+
+	if (GLEW_ARB_vertex_program)
+	{
+		log("ARB vertex supported");
+	}
+
+	if (GLEW_ARB_fragment_program)
+	{
+		log("Fragment supported");
+	}
+
+#endif
 
     log("net");
     if(enet_initialize()<0) fatal("Unable to initialise network module");
@@ -155,7 +210,16 @@ int main(int argc, char **argv)
     keyrepeat(false);
     SDL_ShowCursor(0);
 
+	char *version = (char*)glGetString(GL_VERSION);
+	char *render = (char*)glGetString(GL_RENDERER);
+	char *vendor = (char*)glGetString(GL_VENDOR);
+	char *glewV = (char*)glewGetString(GLEW_VERSION);
+
 	log("gl");
+	log(version);
+	log(render);
+	log(vendor);
+	log(glewV);
 	SDL_GL_CreateContext(mainWindow); // init opengl in sdl2
     gl_init(scr_w, scr_h);
 

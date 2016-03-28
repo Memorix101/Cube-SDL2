@@ -8,7 +8,7 @@ void backup(char *name, char *backupname)
     rename(name, backupname);
 };
 
-string cgzname, bakname, pcfname, mcfname; 
+string cgzname, txtname, bakname, pcfname, mcfname; 
 
 void setnames(char *name)
 {
@@ -25,6 +25,7 @@ void setnames(char *name)
         strcpy_s(mapname, name);
     };
     sprintf_s(cgzname)("packages/%s/%s.cgz",      pakname, mapname);
+	sprintf_s(txtname)("%s.txt", pakname, mapname);
     sprintf_s(bakname)("packages/%s/%s_%d.BAK",   pakname, mapname, lastmillis);
     sprintf_s(pcfname)("packages/%s/package.cfg", pakname);
     sprintf_s(mcfname)("packages/%s/%s.cfg",      pakname, mapname);
@@ -110,7 +111,7 @@ void writemap(char *mname, int msize, uchar *mdata)
     if(!f) { conoutf("could not write map to %s", cgzname); return; };
     fwrite(mdata, 1, msize, f);
     fclose(f);
-    conoutf("wrote map %s as file %s", mname, cgzname);
+    conoutf("wrote map %s as file %s", mname, txtname);
 }
 
 uchar *readmap(char *mname, int *msize)
@@ -118,6 +119,7 @@ uchar *readmap(char *mname, int *msize)
     setnames(mname);
     uchar *mdata = (uchar *)loadfile(cgzname, msize);
     if(!mdata) { conoutf("could not read map %s", cgzname); return NULL; };
+
     return mdata;
 }
 
@@ -132,9 +134,9 @@ void save_world(char *mname)
     toptimize();
     if(!*mname) mname = getclientmap();
     setnames(mname);
-    backup(cgzname, bakname);
-    gzFile f = gzopen(cgzname, "wb9");
-    if(!f) { conoutf("could not write map to %s", cgzname); return; };
+    backup(txtname, txtname);
+    gzFile f = gzopen(txtname, "wb0");
+    if(!f) { conoutf("could not write map to %s", txtname); return; };
     hdr.version = MAPVERSION;
     hdr.numents = 0;
     loopv(ents) if(ents[i].type!=NOTUSED) hdr.numents++;
@@ -202,7 +204,7 @@ void save_world(char *mname)
     };
     spurge;
     gzclose(f);
-    conoutf("wrote map file %s", cgzname);
+    conoutf("wrote map file %s", txtname);
     settagareas();
 };
 
@@ -306,7 +308,12 @@ void load_world(char *mname)        // still supports all map formats that have 
         texuse[s->wtex] = 1;
         if(!SOLID(s)) texuse[s->utex] = texuse[s->ftex] = texuse[s->ctex] = 1;
     };
+
     gzclose(f);
+
+	save_world(mname);
+
+
     calclight();
     settagareas();
     int xs, ys;

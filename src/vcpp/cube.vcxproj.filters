@@ -71,6 +71,9 @@
     <ClInclude Include="..\enet\include\enet\win32.h">
       <Filter>headers\eneth</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\shader.h">
+      <Filter>headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\cube\docs\config.html">
@@ -232,6 +235,9 @@
     </ClCompile>
     <ClCompile Include="..\src\tools.cpp">
       <Filter>support</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\shader.cpp">
+      <Filter>render</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

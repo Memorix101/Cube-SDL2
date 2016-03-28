@@ -285,4 +285,3 @@ enum    // function signatures for script functions, see command.cpp
 #include <zlib.h>
 
 #include "protos.h"				// external function decls
-
