@@ -5,6 +5,8 @@ In this version we (Hyatukate and me) tried implementing shaders, but's not work
 Also I tried to save the maps without the zlib compression to make them
 readable in a text editor
 
+How the current progress looks like: https://www.youtube.com/watch?v=CfO7UPHrLhU
+
 https://github.com/Hyatukate
 
 ![screenshot 18](https://cloud.githubusercontent.com/assets/1466920/14064549/92ad52ee-f407-11e5-9ba6-3a2ce4da5c08.png)
