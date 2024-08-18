@@ -1,1 +1,1 @@
-bin\cubed.exe -w1024 -h768 -t %*
+bin\cube.exe -w1024 -h768 -t %*

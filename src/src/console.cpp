@@ -240,6 +240,79 @@ void keypress(int code, bool isdown, int cooked)
     };
 };
 
+void joypress(int code, bool isdown, int cooked)
+{
+	if (saycommandon)                                // keystrokes go to commandline
+	{
+		if (isdown)
+		{
+			switch (code)
+			{
+			case SDL_CONTROLLER_BUTTON_A:
+				break;
+
+			case SDLK_BACKSPACE:
+			case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+			{
+				for (int i = 0; commandbuf[i]; i++) if (!commandbuf[i + 1]) commandbuf[i] = 0;
+				resetcomplete();
+				break;
+			};
+
+			case SDL_CONTROLLER_BUTTON_DPAD_UP:
+				if (histpos) strcpy_s(commandbuf, vhistory[--histpos]);
+				break;
+
+			case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+				if (histpos<vhistory.length()) strcpy_s(commandbuf, vhistory[histpos++]);
+				break;
+
+			case SDLK_TAB:
+				complete(commandbuf);
+				break;
+
+			case SDLK_v:
+				if (SDL_GetModState()&(KMOD_LCTRL | KMOD_RCTRL)) { pasteconsole(); return; };
+
+			default:
+				resetcomplete();
+				if (cooked) { char add[] = { cooked, 0 }; strcat_s(commandbuf, add); };
+			};
+		}
+		else
+		{
+			if (code == SDL_CONTROLLER_BUTTON_A)
+			{
+				if (commandbuf[0])
+				{
+					if (vhistory.empty() || strcmp(vhistory.last(), commandbuf))
+					{
+						vhistory.add(newstring(commandbuf));  // cap this?
+					};
+					histpos = vhistory.length();
+					if (commandbuf[0] == '/') execute(commandbuf, true);
+					else toserver(commandbuf);
+				};
+				saycommand(NULL);
+			}
+			else if (code == SDL_CONTROLLER_BUTTON_START)
+			{
+				saycommand(NULL);
+			};
+		};
+	}
+	else if (!menukey(code, isdown))                 // keystrokes go to menu
+	{
+		loopi(numkm) if (keyms[i].code == code)        // keystrokes go to game, lookup in keymap and execute
+		{
+			string temp;
+			strcpy_s(temp, keyms[i].action);
+			execute(temp, isdown);
+			return;
+		};
+	};
+};
+
 char *getcurcommand()
 {
     return saycommandon ? commandbuf : NULL;
