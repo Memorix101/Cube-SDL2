@@ -1,5 +1,7 @@
 // one big bad include file for the whole engine... nasty!
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved 
+
 #include "tools.h"			
 
 enum                            // block types, order matters!
@@ -138,12 +140,12 @@ enum { M_NONE = 0, M_SEARCH, M_HOME, M_ATTACKING, M_PAIN, M_SLEEP, M_AIMING };  
 #define MAXTRANS 5000                   // max amount of data to swallow in 1 go
 #define CUBE_SERVER_PORT 28765
 #define CUBE_SERVINFO_PORT 28766
-#define PROTOCOL_VERSION 122            // bump when protocol changes
+#define PROTOCOL_VERSION 121            // bump when protocol changes
 
 // network messages codes, c2s, c2c, s2c
 enum
 {
-    SV_INITS2C, SV_INITC2S, SV_POS, SV_TEXT, SV_SOUND, SV_CDIS,
+    SV_INITS2C = 0, SV_INITC2S, SV_POS, SV_TEXT, SV_SOUND, SV_CDIS,
     SV_DIED, SV_DAMAGE, SV_SHOT, SV_FRAGS,
     SV_TIMEUP, SV_EDITENT, SV_MAPRELOAD, SV_ITEMACC,
     SV_MAPCHANGE, SV_ITEMSPAWN, SV_ITEMPICKUP, SV_DENIED,
@@ -178,10 +180,6 @@ enum
     S_JUMPPAD,
 };
 
-// vertex array format
-
-struct vertex { float u, v, x, y, z; uchar r, g, b, a; }; 
-
 typedef vector<dynent *> dvector;
 typedef vector<char *> cvector;
 typedef vector<int> ivector;
@@ -203,7 +201,6 @@ extern int gamemode, nextmode;
 extern int xtraverts;
 extern bool demoplayback;
 
-
 #define DMF 16.0f 
 #define DAF 1.0f 
 #define DVF 100.0f
@@ -212,6 +209,14 @@ extern bool demoplayback;
 #define VIRTH 1800
 #define FONTH 64
 #define PIXELTAB (VIRTW/12)
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+// PI and 2PI in fixed point
+#define PI_FX 0x0003243F
+#define TWOPI_FX 0x0006487E
+#endif /* _WIN32_WCE */
+// End Intel Corporation code
 
 #define PI  (3.1415927f)
 #define PI2 (2*PI)
@@ -252,14 +257,12 @@ enum    // function signatures for script functions, see command.cpp
 // nasty macros for registering script functions, abuses globals to avoid excessive infrastructure
 #define COMMANDN(name, fun, nargs) static bool __dummy_##fun = addcommand(#name, (void (*)())fun, nargs)
 #define COMMAND(name, nargs) COMMANDN(name, name, nargs)
-#define VARP(name, min, cur, max) int name = variable(#name, min, cur, max, &name, NULL, true)
-#define VAR(name, min, cur, max)  int name = variable(#name, min, cur, max, &name, NULL, false)
-#define VARF(name, min, cur, max, body)  void var_##name(); static int name = variable(#name, min, cur, max, &name, var_##name, false); void var_##name() { body; }
-#define VARFP(name, min, cur, max, body) void var_##name(); static int name = variable(#name, min, cur, max, &name, var_##name, true); void var_##name() { body; }
+#define VAR(name, min, cur, max) int name = variable(#name, min, cur, max, &name, NULL)
+#define VARF(name, min, cur, max, body) void var_##name(); static int name = variable(#name, min, cur, max, &name, var_##name); void var_##name() { body; }
 
 #define ATOI(s) strtol(s, NULL, 0)		// supports hexadecimal numbers
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32_WCE)
 	#define WIN32_LEAN_AND_MEAN
 	#include "windows.h"
 	#define _WINDOWS
@@ -270,14 +273,17 @@ enum    // function signatures for script functions, see command.cpp
 
 #include <time.h>
 
-#include <GL/glew.h>
-#include <SDL_opengl.h>
-#include <GL/GL.h>
-#include <GL/GLU.h>
-#include <GL/glext.h>
+#ifdef _WIN32_WCE // Begin Intel Corporation code
+	// include OpenGL ES and GAPI headers
+	#include <gles/gl.h>
+	#include <gx.h>
+#else // End Intel Corporation code
+	#include <GL/gl.h>
+	#include <GL/glu.h>
+	#include <GL/glext.h>
+#endif /* _WIN32_WCE */
 
 #include <SDL.h>
-
 #include <SDL_image.h>
 
 #include <enet/enet.h>
@@ -286,3 +292,374 @@ enum    // function signatures for script functions, see command.cpp
 
 #include "protos.h"				// external function decls
 
+// vertex array format
+#ifdef _WIN32_WCE // Begin Intel Corporation code
+// fixed point storage of vertices, much faster than last second conversion
+struct vertex { GLfixed u, v, x, y, z; uchar r, g, b, a; };
+#else // End Intel Corporation code
+struct vertex { float u, v, x, y, z; uchar r, g, b, a; }; 
+#endif /* _WIN32_WCE */
+
+#ifdef _WIN32_WCE // Begin Intel Corporation code
+
+// global functions
+extern const GLfixed divtable[128][128];
+extern void reloadtextures();
+extern void reloadmodeltextures();
+extern BOOL ResetPocketPC();
+extern void quit();
+
+// Often used fixed numbers
+#define HALF_FX 0x00008000
+#define ONE_FX 0x00010000
+#define TWO_FX 0x00020000
+#define THREE_FX 0x00030000
+#define FOUR_FX 0x00040000
+#define SIXTEEN_FX 0x00100000
+#define ONETWENTYEIGHT_FX 0x00800000
+
+// fixed conversion routines and absolute value
+#define _fixed_shift 16 // our fixed point is 16.16, used throughout
+const float FXFACTOR = (1.0f/65536.0f);
+const float FXINV = 65536.0f;
+
+__inline GLfixed f2x(float f) { return (GLfixed)((f)*FXINV);}
+__inline float x2f(GLfixed x) { return (float)(x)*FXFACTOR; }
+__inline GLfixed i2x(int i) { return (i)<<_fixed_shift; }
+__inline int x2i(GLfixed x) { return int(x)>>_fixed_shift; }
+__inline GLfixed absfx(GLfixed x) { return (x<0) ? -x : x; }
+
+// multiply two fixed values
+__inline GLfixed MulFX(GLfixed x, GLfixed y)
+{
+	__int64 r = ((__int64)x) * y;
+	return (GLint)(r >> 16);
+}
+
+// divide two fixed values with optional table lookup for speed and less precision
+__forceinline GLfixed DivFX(const GLfixed x, const GLfixed y, bool fast = false) 
+{
+	// check boundaries and fast directive
+	if(fast && absfx(x) < ONETWENTYEIGHT_FX && absfx(y) < ONETWENTYEIGHT_FX)
+	{
+		// positive x
+		if(x >= HALF_FX)
+		{
+			// positive y
+			if(y >= HALF_FX)
+				return divtable[x2i(x+HALF_FX)-1][x2i(y+HALF_FX)-1];
+			// negative y
+			else
+				return -divtable[x2i(x+HALF_FX)-1][x2i(-y+HALF_FX)-1];
+		}
+		// negative x
+		else
+		{
+			// positive y
+			if(y >= HALF_FX)
+				return -divtable[x2i(-x+HALF_FX)-1][x2i(y+HALF_FX)-1];
+			// negative y
+			else
+				return divtable[x2i(-x+HALF_FX)-1][x2i(-y+HALF_FX)-1];
+		}
+	}
+	else
+		// regular slow and precise divide
+		return (GLint)((((__int64)x)<<16)/(y));
+}
+
+// fixed point sin
+__inline GLfixed SinFX(const GLfixed x)
+{
+	return f2x((float)sin(x2f(x)));
+}
+
+// fixed point cosine
+__inline GLfixed CosFX(const GLfixed x)
+{
+	return f2x((float)cos(x2f(x)));
+}
+
+// fixed point tangent
+__inline GLfixed TanFX(const GLfixed x)
+{
+	return f2x((float)tan(x2f(x)));
+}
+
+// Rewrite of OpenGL ES transform stack to work around the QueryMatrixOES 
+// function that is missing in some implementations
+
+extern GLfixed modelview[16];
+extern GLfixed projection[16];
+extern vector<GLfixed *>modelstack;
+extern vector<GLfixed *>projstack;
+
+// intended to emulate glLoadIdentity
+__inline void identity(GLfixed *curMtrx) 
+{
+    curMtrx[0] = ONE_FX;  curMtrx[4] = 0;		curMtrx[8] = 0;			curMtrx[12] = 0;
+    curMtrx[1] = 0;		  curMtrx[5] = ONE_FX;  curMtrx[9] = 0;			curMtrx[13] = 0;
+    curMtrx[2] = 0;		  curMtrx[6] = 0;		curMtrx[10] = ONE_FX;   curMtrx[14] = 0;
+    curMtrx[3] = 0;		  curMtrx[7] = 0;		curMtrx[11] = 0;		curMtrx[15] = ONE_FX;
+	
+	glLoadIdentity();
+}
+
+// push a projection matrix onto projstack
+__inline void pushProjMatrix()
+{
+	GLfixed *toAdd = new GLfixed[16];
+
+	for(int i = 0; i < 16; i++)
+		toAdd[i] = projection[i];
+
+	projstack.add(toAdd);
+}
+
+// push a modelview matrix onto modelstack
+__inline void pushModelMatrix()
+{
+	GLfixed *toAdd = new GLfixed[16];
+
+	for(int i = 0; i < 16; i++)
+		toAdd[i] = modelview[i];
+
+	modelstack.add(toAdd);
+}
+
+// pop the top projection matrix from projstack
+__inline void popProjMatrix()
+{
+	// if empty, top is always identity
+	if(projstack.length() == 0)
+		identity(projection);
+	else
+	{
+		GLfixed *temp = projstack.pop();
+
+		for(int i = 0; i < 16; i++)
+			projection[i] = temp[i];
+
+		delete temp;
+
+		// load the popped matrix into OpenGL, assumes state is set correctly
+		glLoadMatrixx(projection);
+	}
+}
+
+// pop the top modelview matrix from modelstack
+__inline void popModelMatrix()
+{
+	// if empty, top is always identity
+	if(modelstack.length() == 0)
+		identity(modelview);
+	else
+	{
+		GLfixed *temp = modelstack.pop();
+
+		for(int i = 0; i < 16; i++)
+			modelview[i] = temp[i];
+
+		delete temp;
+
+		// load the popped matrix into OpenGL, assumes state is set correctly
+		glLoadMatrixx(modelview);
+	}
+}
+
+// 4x4 fixed point matrix multiply
+__inline void matrixMultiply(const GLfixed *in1, const GLfixed *in2, GLfixed *out)
+{
+	if(!out || !in1 || !in2) return;
+
+	out[0] = MulFX(in1[0],in2[0]) + MulFX(in1[1],in2[4]) + MulFX(in1[2],in2[8]) + MulFX(in1[3],in2[12]);    
+	out[1] = MulFX(in1[0],in2[1]) + MulFX(in1[1],in2[5]) + MulFX(in1[2],in2[9]) + MulFX(in1[3],in2[13]);    
+	out[2] = MulFX(in1[0],in2[2]) + MulFX(in1[1],in2[6]) + MulFX(in1[2],in2[10]) + MulFX(in1[3],in2[14]);    
+	out[3] = MulFX(in1[0],in2[3]) + MulFX(in1[1],in2[7]) + MulFX(in1[2],in2[11]) + MulFX(in1[3],in2[15]);    
+	out[4] = MulFX(in1[4],in2[0]) + MulFX(in1[5],in2[4]) + MulFX(in1[6],in2[8]) + MulFX(in1[7],in2[12]);    
+	out[5] = MulFX(in1[4],in2[1]) + MulFX(in1[5],in2[5]) + MulFX(in1[6],in2[9]) + MulFX(in1[7],in2[13]);    
+	out[6] = MulFX(in1[4],in2[2]) + MulFX(in1[5],in2[6]) + MulFX(in1[6],in2[10]) + MulFX(in1[7],in2[14]);    
+	out[7] = MulFX(in1[4],in2[3]) + MulFX(in1[5],in2[7]) + MulFX(in1[6],in2[11]) + MulFX(in1[7],in2[15]);    
+	out[8] = MulFX(in1[8],in2[0]) + MulFX(in1[9],in2[4]) + MulFX(in1[10],in2[8]) + MulFX(in1[11],in2[12]);    
+	out[9] = MulFX(in1[8],in2[1]) + MulFX(in1[9],in2[5]) + MulFX(in1[10],in2[9]) + MulFX(in1[11],in2[13]);    
+	out[10] = MulFX(in1[8],in2[2]) + MulFX(in1[9],in2[6]) + MulFX(in1[10],in2[10]) + MulFX(in1[11],in2[14]);    
+	out[11] = MulFX(in1[8],in2[3]) + MulFX(in1[9],in2[7]) + MulFX(in1[10],in2[11]) + MulFX(in1[11],in2[15]);    
+	out[12] = MulFX(in1[12],in2[0]) + MulFX(in1[13],in2[4]) + MulFX(in1[14],in2[8]) + MulFX(in1[15],in2[12]);    
+	out[13] = MulFX(in1[12],in2[1]) + MulFX(in1[13],in2[5]) + MulFX(in1[14],in2[9]) + MulFX(in1[15],in2[13]);    
+	out[14] = MulFX(in1[12],in2[2]) + MulFX(in1[13],in2[6]) + MulFX(in1[14],in2[10]) + MulFX(in1[15],in2[14]);    
+	out[15] = MulFX(in1[12],in2[3]) + MulFX(in1[13],in2[7]) + MulFX(in1[14],in2[11]) + MulFX(in1[15],in2[15]);
+}
+
+// intended to emulate glRotatex
+__inline void rotate(GLfixed *curMtrx, GLfixed angle, GLfixed x, GLfixed y, GLfixed z)
+{
+	if(!curMtrx) return;
+
+	GLfixed m[16];
+
+	const GLfixed c = f2x((float)cos(x2f(angle) * (3.14159f/180.0f)));
+	const GLfixed s = f2x((float)sin(x2f(angle) * (3.14159f/180.0f)));
+	const GLfixed mag = MulFX(x, x) + MulFX(y, y) + MulFX(z, z);
+
+	// inverse sqrt to normalize
+	// method from comp.graphics.algorithms
+	float w = x2f(mag);
+	float whalf = 0.5f*w;
+	int i = *(int*)&w;
+	i = 0x5f3759df - (i >> 1);
+	w = *(float*)&i;
+	w = w*(1.5f - whalf*w*w);
+	
+	GLfixed n = f2x(w);
+
+	x = MulFX(x, n);
+	y = MulFX(y, n);
+	z = MulFX(z, n);
+
+	m[0] = MulFX(x, MulFX(x, ONE_FX - c)) + c;	
+	m[1] = MulFX(x, MulFX(y, ONE_FX-c)) + MulFX(z, s);
+	m[2] = MulFX(z, MulFX(x, ONE_FX-c)) - MulFX(y, s);
+	m[3] = 0;
+
+	m[4] = MulFX(x, MulFX(y, ONE_FX-c)) - MulFX(z, s);
+	m[5] = MulFX(y, MulFX(y, ONE_FX - c)) + c;
+	m[6] = MulFX(y, MulFX(z, ONE_FX-c)) + MulFX(x, s);
+	m[7] = 0;
+
+	m[8] = MulFX(z, MulFX(x, ONE_FX-c)) + MulFX(y, s);
+	m[9] = MulFX(y, MulFX(z, ONE_FX-c)) - MulFX(x, s);
+	m[10] = MulFX(z, MulFX(z, ONE_FX - c)) + c;
+	m[11] = 0;
+
+	m[12] = 0;
+	m[13] = 0;
+	m[14] = 0;
+	m[15] = ONE_FX;
+
+	GLfixed out[16];
+
+	matrixMultiply(m, curMtrx, out);
+
+	for(int j = 0; j < 16; j++)
+		curMtrx[j] = out[j];
+
+	// load newly rotated matrix into OpenGL
+	glLoadMatrixx(curMtrx);
+}
+
+// intended to emulate glTranslatex
+__inline void translate(GLfixed *curMtrx, const GLfixed x, const GLfixed y, const GLfixed z)
+{
+	if(!curMtrx) return;
+
+	GLfixed m[16];
+	
+	m[0] = ONE_FX;
+	m[1] = 0;
+	m[2] = 0;
+	m[3] = 0;
+
+	m[4] = 0;
+	m[5] = ONE_FX;
+	m[6] = 0;
+	m[7] = 0;
+	
+	m[8] = 0;
+	m[9] = 0;
+	m[10] = ONE_FX;
+	m[11] = 0;
+	
+	m[12] = x;
+	m[13] = y;
+	m[14] = z;
+	m[15] = ONE_FX;
+
+	GLfixed out[16];
+
+	matrixMultiply(m, curMtrx, out);
+
+	for(int i = 0; i < 16; i++)
+		curMtrx[i] = out[i];
+
+	// load newly translated matrix into OpenGL
+	glLoadMatrixx(curMtrx);
+}
+
+// intended to emulate glFrustumx
+__inline void frust(GLfixed *curMtrx, const GLfixed left, const GLfixed right, 
+					  const GLfixed bottom, const GLfixed top, const GLfixed zNear, const GLfixed zFar)
+{	
+	if(!curMtrx) return;
+
+	GLfixed m[16], out[16];
+
+	// do not use fast directive on divides, precision is needed here
+	m[0] = DivFX(MulFX(TWO_FX, zNear), right-left);
+	m[1] = 0;
+	m[2] = 0; 
+	m[3] = 0;
+
+	m[4] = 0;
+	m[5] = DivFX(MulFX(TWO_FX, zNear), top-bottom);
+	m[6] = 0;
+	m[7] = 0;
+		
+	m[8] = DivFX(right+left, right-left);
+	m[9] = DivFX(top+bottom, top-bottom);
+	m[10] = DivFX(-(zFar+zNear), zFar-zNear);
+	m[11] = -ONE_FX;
+	
+	m[12] = 0;
+	m[13] = 0;
+	m[14] = DivFX(-MulFX(MulFX(TWO_FX,zFar), zNear), zFar-zNear);
+	m[15] = 0;
+
+	matrixMultiply(m, curMtrx, out);
+
+	for(int i = 0; i < 16; i++)
+		curMtrx[i] = out[i];
+
+	// load new matrix into OpenGL
+	glLoadMatrixx(curMtrx);
+}
+
+// intended to emulate glOrthox
+__inline void ortho(GLfixed *curMtrx, const GLfixed left, const GLfixed right, const GLfixed bottom, 
+					const GLfixed top, const GLfixed zNear, const GLfixed zFar)
+{
+	if(!curMtrx) return;
+
+	GLfixed m[16], out[16];
+
+	// do not use fast directive on divides, precision is needed here
+	m[0] = DivFX(TWO_FX, right - left);
+	m[1] = 0;
+	m[2] = 0;
+	m[3] = 0;
+
+	m[4] = 0;
+	m[5] = DivFX(TWO_FX, top - bottom);
+	m[6] = 0;
+	m[7] = 0;
+	
+	m[8] = 0;
+	m[9] = 0;
+	m[10] = -DivFX(TWO_FX, zFar - zNear);
+	m[11] = 0;
+	
+	m[12] = DivFX(-(right+left), right - left);
+	m[13] = DivFX(-(top+bottom), top - bottom);
+	m[14] = DivFX(-(zFar+zNear), zFar - zNear);
+	m[15] = ONE_FX;
+
+	matrixMultiply(m, curMtrx, out);
+
+	for(int i = 0; i < 16; i++)
+		curMtrx[i] = out[i];
+
+	// load new matrix into OpenGL
+	glLoadMatrixx(curMtrx);
+}
+
+#endif /* _WIN32_WCE */
+// End Intel Corporation code

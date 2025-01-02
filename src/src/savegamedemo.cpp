@@ -1,5 +1,7 @@
 // loading and saving of savegames & demos, dumps the spawn state of all mapents, the full state of all dynents (monsters + player)
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
 extern int islittleendian;
@@ -42,8 +44,27 @@ void stopifrecording() { if(demorecording) stop(); };
 void savestate(char *fn)
 {
     stop();
-    f = gzopen(fn, "wb9");
-    if(!f) { conoutf("could not write %s", fn); return; };
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// relative path fix for PocketPC
+
+	wchar_t relpath[MAX_PATH];
+	char filepath[MAX_PATH];
+	int i;
+
+	GetModuleFileName(GetModuleHandle(NULL), relpath, MAX_PATH);
+	for(i = wcslen(relpath); i && relpath[i]!=L'\\'; i--);
+	relpath[i+1] = L'\0';
+	WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+	strcat(filepath, fn);
+	f = gzopen(filepath, "rb9");
+#else // End Intel Corporation code
+    f = gzopen(fn, "rb9");
+#endif /* _WIN32_WCE */
+    
+    if(!f) { conoutf("could not write %s", (int)fn); return; };
     gzwrite(f, (void *)"CUBESAVE", 8);
     gzputc(f, islittleendian);  
     gzputi(SAVEGAMEVERSION);
@@ -70,15 +91,34 @@ void savegame(char *name)
     sprintf_sd(fn)("savegames/%s.csgz", name);
     savestate(fn);
     stop();
-    conoutf("wrote %s", fn);
+    conoutf("wrote %s", (int)fn);
 };
 
 void loadstate(char *fn)
 {
     stop();
     if(multiplayer()) return;
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// relative path fix for PocketPC
+
+	wchar_t relpath[MAX_PATH];
+	char filepath[MAX_PATH];
+	int i;
+
+	GetModuleFileName(GetModuleHandle(NULL), relpath, MAX_PATH);
+	for(i = wcslen(relpath); i && relpath[i]!=L'\\'; i--);
+	relpath[i+1] = L'\0';
+	WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+	strcat(filepath, fn);
+	f = gzopen(filepath, "rb9");
+#else // End Intel Corporation code
     f = gzopen(fn, "rb9");
-    if(!f) { conoutf("could not open %s", fn); return; };
+#endif /* _WIN32_WCE */
+
+    if(!f) { conoutf("could not open %s", (int)fn); return; };
     
     string buf;
     gzread(f, buf, 8);
@@ -111,7 +151,11 @@ void loadgamerest()
 {
     if(demoplayback || !f) return;
         
-    if(gzgeti()!=ents.length()) return loadgameout();
+    if(gzgeti()!=ents.length())
+	{
+		loadgameout();
+		return;
+	}
     loopv(ents)
     {
         ents[i].spawned = gzgetc(f)!=0;   
@@ -124,7 +168,11 @@ void loadgamerest()
     
     int nmonsters = gzgeti();
     dvector &monsters = getmonsters();
-    if(nmonsters!=monsters.length()) return loadgameout();
+    if(nmonsters!=monsters.length())
+	{
+		loadgameout();
+		return;
+	}
     loopv(monsters)
     {
         gzread(f, monsters[i], sizeof(dynent));
@@ -161,7 +209,7 @@ void record(char *name)
     sprintf_sd(fn)("demos/%s.cdgz", name);
     savestate(fn);
     gzputi(cn);
-    conoutf("started recording demo to %s", fn);
+    conoutf("started recording demo to %s", (int)fn);
     demorecording = true;
     starttime = lastmillis;
 	ddamage = bdamage = 0;

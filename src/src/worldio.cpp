@@ -1,11 +1,26 @@
 // worldio.cpp: loading & saving of maps and savegames
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
 void backup(char *name, char *backupname)
 {
-    remove(backupname);
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// char versions not supplied in PocketPC, use wchar instead
+	wchar_t *wname = NULL;
+	wchar_t *wbackupname = NULL;
+
+	mbstowcs(wname, name, strlen(name));
+	mbstowcs(wbackupname, backupname, strlen(backupname));
+
+	DeleteFile(wname);
+	MoveFile(wname, wbackupname);
+#else // End Intel Corporation code
+	remove(backupname);
     rename(name, backupname);
+#endif /* _WIN32_WCE */
 };
 
 string cgzname, bakname, pcfname, mcfname; 
@@ -106,18 +121,37 @@ void writemap(char *mname, int msize, uchar *mdata)
 {
     setnames(mname);
     backup(cgzname, bakname);
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// relative path fix for PocketPC
+
+	wchar_t relpath[MAX_PATH];
+	char filepath[MAX_PATH];
+	int i;
+
+	GetModuleFileName(GetModuleHandle(NULL), relpath, MAX_PATH);
+	for(i = wcslen(relpath); i && relpath[i]!=L'\\'; i--);
+	relpath[i+1] = L'\0';
+	WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+	strcat(filepath, cgzname);
+	FILE *f = fopen(filepath, "wb");
+#else // End Intel Corporation code
     FILE *f = fopen(cgzname, "wb");
-    if(!f) { conoutf("could not write map to %s", cgzname); return; };
+#endif /* _WIN32_WCE */
+
+    if(!f) { conoutf("could not write map to %s", (int)cgzname); return; };
     fwrite(mdata, 1, msize, f);
     fclose(f);
-    conoutf("wrote map %s as file %s", mname, cgzname);
+    conoutf("wrote map %s as file %s", (int)mname, (int)cgzname);
 }
 
 uchar *readmap(char *mname, int *msize)
 {
     setnames(mname);
     uchar *mdata = (uchar *)loadfile(cgzname, msize);
-    if(!mdata) { conoutf("could not read map %s", cgzname); return NULL; };
+    if(!mdata) { conoutf("could not read map %s", (int)cgzname); return NULL; };
     return mdata;
 }
 
@@ -133,8 +167,26 @@ void save_world(char *mname)
     if(!*mname) mname = getclientmap();
     setnames(mname);
     backup(cgzname, bakname);
-    gzFile f = gzopen(cgzname, "wb9");
-    if(!f) { conoutf("could not write map to %s", cgzname); return; };
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// relative path fix for PocketPC
+
+	wchar_t relpath[MAX_PATH];
+	char filepath[MAX_PATH];
+	GetModuleFileName(GetModuleHandle(NULL),relpath,MAX_PATH);
+	for(int q=wcslen(relpath); q && relpath[q]!=L'\\';q--);
+	relpath[q+1]=L'\0';
+
+	WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+	strcat(filepath, cgzname);
+	gzFile f = gzopen(filepath, "wb9");
+#else // End Intel Corporation code
+    gzFile f = gzopen(cgzname, "rb9");
+#endif /* _WIN32_WCE */
+
+    if(!f) { conoutf("could not write map to %s", (int)cgzname); return; };
     hdr.version = MAPVERSION;
     hdr.numents = 0;
     loopv(ents) if(ents[i].type!=NOTUSED) hdr.numents++;
@@ -202,18 +254,37 @@ void save_world(char *mname)
     };
     spurge;
     gzclose(f);
-    conoutf("wrote map file %s", cgzname);
+    conoutf("wrote map file %s", (int)cgzname);
     settagareas();
 };
 
 void load_world(char *mname)        // still supports all map formats that have existed since the earliest cube betas!
 {
+	int i;
     stopifrecording();
     cleardlights();
     pruneundos();
-    setnames(mname);
+	setnames(mname);
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// relative path fix for PocketPC
+
+	wchar_t relpath[MAX_PATH];
+	char filepath[MAX_PATH];
+	GetModuleFileName(GetModuleHandle(NULL),relpath,MAX_PATH);
+	for(int q=wcslen(relpath); q && relpath[q]!=L'\\';q--);
+	relpath[q+1]=L'\0';
+
+	WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+	strcat(filepath, cgzname);
+	gzFile f = gzopen(filepath, "rb9");
+#else // End Intel Corporation code  
     gzFile f = gzopen(cgzname, "rb9");
-    if(!f) { conoutf("could not read map %s", cgzname); return; };
+#endif /* _WIN32_WCE */
+
+    if(!f) { conoutf("could not read map %s", (int)cgzname); return; };
     gzread(f, &hdr, sizeof(header)-sizeof(int)*16);
     endianswap(&hdr.version, sizeof(int), 4);
     if(strncmp(hdr.head, "CUBE", 4)!=0) fatal("while reading map: header malformatted");
@@ -229,7 +300,7 @@ void load_world(char *mname)        // still supports all map formats that have 
         hdr.waterlevel = -100000;
     };
     ents.setsize(0);
-    loopi(hdr.numents)
+    for(i = 0; i < hdr.numents; i++)
     {
         entity &e = ents.add();
         gzread(f, &e, sizeof(persistent_entity));
@@ -244,7 +315,8 @@ void load_world(char *mname)        // still supports all map formats that have 
     free(world);
     setupworld(hdr.sfactor);
 	char texuse[256];
-	loopi(256) texuse[i] = 0;
+	for(i = 0; i < 256; i++)
+		texuse[i] = 0;
     sqr *t = NULL;
     loopk(cubicsize)
     {
@@ -310,9 +382,10 @@ void load_world(char *mname)        // still supports all map formats that have 
     calclight();
     settagareas();
     int xs, ys;
-    loopi(256) if(texuse) lookuptexture(i, xs, ys);
-    conoutf("read map %s (%d milliseconds)", cgzname, SDL_GetTicks()-lastmillis);
-    conoutf("%s", hdr.maptitle);
+    for(i = 0; i < 256; i++) 
+		if(texuse) lookuptexture(i, xs, ys);
+    conoutf("read map %s (%d milliseconds)", (int)cgzname, SDL_GetTicks()-lastmillis);
+    conoutf("%s", (int)hdr.maptitle);
     startmap(mname);
     loopl(256)
     {

@@ -196,7 +196,6 @@ void pickup(int n, dynent *d)
             if(lastmillis-lastjumppad<300) break;
             lastjumppad = lastmillis;
             vec v = { (int)(char)ents[n].attr3/10.0f, (int)(char)ents[n].attr2/10.0f, ents[n].attr1/10.0f };
-            player1->vel.z = 0;
 			vadd(player1->vel, v);
             playsoundc(S_JUMPPAD);
             break;
@@ -239,4 +238,4 @@ void putitems(uchar *&p)            // puts items in network stream and also spa
 };
 
 void resetspawns() { loopv(ents) ents[i].spawned = false; };
-void setspawn(uint i, bool on) { if(i<(uint)ents.length()) ents[i].spawned = on; };
+void setspawn(int i, bool on) { if(i<ents.length()) ents[i].spawned = on; };

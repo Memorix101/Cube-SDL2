@@ -1,5 +1,7 @@
 // menus.cpp: ingame menu system (also used for scores and serverlist)
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
 struct mitem { char *text, *action; };
@@ -14,7 +16,7 @@ struct gmenu
 
 vector<gmenu> menus;
 
-int vmenu = -1;
+int vmenu = 2;
 
 ivector menustack;
 
@@ -117,7 +119,14 @@ bool menukey(int code, bool isdown)
     int menusel = menus[vmenu].menusel;
     if(isdown)
     {
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+		if(code==SDLK_F3) // third button from left (mail icon usually)
+#else // End Intel Corporation code
         if(code==SDLK_ESCAPE)
+#endif /* _WIN32_WCE */
+
         {
             menuset(-1);
             if(!menustack.empty()) menuset(menustack.pop());

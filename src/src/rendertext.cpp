@@ -1,5 +1,7 @@
 // rendertext.cpp: based on Don's gl_text.cpp
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
 short char_coords[96][4] = 
@@ -118,9 +120,9 @@ int text_width(char *str)
 }
 
 
-void draw_textf(char *fstr, int left, int top, int gl_num, ...)
+void draw_textf(char *fstr, int left, int top, int gl_num, int arg)
 {
-    sprintf_sdlv(str, gl_num, fstr);
+    sprintf_sd(str)(fstr,arg);
     draw_text(str, left, top, gl_num);
 };
 
@@ -128,7 +130,13 @@ void draw_text(char *str, int left, int top, int gl_num)
 {
     glBlendFunc(GL_ONE, GL_ONE);
     glBindTexture(GL_TEXTURE_2D, gl_num);
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	glColor4x(ONE_FX,ONE_FX,ONE_FX,ONE_FX);
+#else // End Intel Corporation code
     glColor3ub(255,255,255);
+#endif /* _WIN32_WCE */
 
     int x = left;
     int y = top;
@@ -141,7 +149,16 @@ void draw_text(char *str, int left, int top, int gl_num)
     {
         int c = str[i];
         if(c=='\t') { x = (x-left+PIXELTAB)/PIXELTAB*PIXELTAB+left; continue; }; 
-        if(c=='\f') { glColor3ub(64,255,128); continue; };
+        if(c=='\f') 
+		{
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+			glColor4x(f2x(64.0f/255.0f), ONE_FX, f2x(128.0f/255.0f), ONE_FX);
+#else // End Intel Corporation code 
+			glColor3ub(64,255,128); 
+#endif /* _WIN32_WCE */
+			continue; 
+		};
         if(c==' ') { x += FONTH/2; continue; };
         c -= 33;
         if(c<0 || c>=95) continue;
@@ -151,15 +168,45 @@ void draw_text(char *str, int left, int top, int gl_num)
         in_right   = ((float) char_coords[c][2])   / 512.0f;
         in_bottom  = ((float) char_coords[c][3]-2) / 512.0f;
 
-        in_width   = char_coords[c][2] - char_coords[c][0];
-        in_height  = char_coords[c][3] - char_coords[c][1];
+        in_width   = (int)(char_coords[c][2] - char_coords[c][0]);
+        in_height  = (int)(char_coords[c][3] - char_coords[c][1]);
 
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+		// GL_QUADS to GL_TRIANGLES
+		GLfixed vertexarray[12] = { i2x(x), i2x(y),
+								  i2x(x + in_width), i2x(y),
+								  i2x(x + in_width), i2x(y + in_height),
+								  i2x(x), i2x(y),
+								  i2x(x + in_width), i2x(y + in_height),
+								  i2x(x), i2x(y + in_height) };
+		
+		GLfixed texarray[] = { f2x(in_left), f2x(in_top),
+							   f2x(in_right), f2x(in_top),
+							   f2x(in_right), f2x(in_bottom),
+							   f2x(in_left), f2x(in_top),
+							   f2x(in_right), f2x(in_bottom),
+							   f2x(in_left), f2x(in_bottom) };
+
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glDisableClientState(GL_COLOR_ARRAY);
+
+		glVertexPointer(2, GL_FIXED, 0, vertexarray);
+		glTexCoordPointer(2, GL_FIXED, 0, texarray);
+
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+#else // End Intel Corporation code
         glBegin(GL_QUADS);
         glTexCoord2f(in_left,  in_top   ); glVertex2i(x,            y);
         glTexCoord2f(in_right, in_top   ); glVertex2i(x + in_width, y);
         glTexCoord2f(in_right, in_bottom); glVertex2i(x + in_width, y + in_height);
         glTexCoord2f(in_left,  in_bottom); glVertex2i(x,            y + in_height);
         glEnd();
+#endif /* _WIN32_WCE */
         
         xtraverts += 4;
         x += in_width  + 1;
@@ -175,12 +222,43 @@ void draw_envbox_aux(float s0, float t0, int x0, int y0, int z0,
                      int texture)
 {
     glBindTexture(GL_TEXTURE_2D, texture);
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// GL_QUADS to GL_TRIANGLES
+	GLfixed vertexarray[] = { i2x(x3), i2x(y3), i2x(z3),
+							  i2x(x2), i2x(y2), i2x(z2),
+							  i2x(x1), i2x(y1), i2x(z1),
+							  i2x(x3), i2x(y3), i2x(z3),
+							  i2x(x1), i2x(y1), i2x(z1),
+							  i2x(x0), i2x(y0), i2x(z0) };
+
+	GLfixed texarray[] = { f2x(s3), f2x(t3),
+						   f2x(s2), f2x(t2),
+						   f2x(s1), f2x(t1),
+						   f2x(s3), f2x(t3),
+						   f2x(s1), f2x(t1),
+						   f2x(s0), f2x(t0) };
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);
+
+	glVertexPointer(3, GL_FIXED, 0, vertexarray);
+	glTexCoordPointer(2, GL_FIXED, 0, texarray);
+
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+#else // End Intel Corporation code
     glBegin(GL_QUADS);
     glTexCoord2f(s3, t3); glVertex3d(x3, y3, z3);
     glTexCoord2f(s2, t2); glVertex3d(x2, y2, z2);
     glTexCoord2f(s1, t1); glVertex3d(x1, y1, z1);
     glTexCoord2f(s0, t0); glVertex3d(x0, y0, z0);
     glEnd();
+#endif /* _WIN32_WCE */
     xtraverts += 4;
 }
 

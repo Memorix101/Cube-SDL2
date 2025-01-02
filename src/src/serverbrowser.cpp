@@ -1,5 +1,7 @@
 // serverbrowser.cpp: eihrul's concurrent resolver, and server browser window management
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 #include "SDL_thread.h"
 
@@ -70,12 +72,12 @@ void resolverinit(int threads, int limit)
 void resolverstop(resolverthread &rt, bool restart)
 {
     SDL_LockMutex(resolvermutex);
-   // SDL_KillThread(rt.thread);
-	SDL_WaitThread(rt.thread, NULL);
+    //SDL_KillThread(rt.thread);
+    SDL_WaitThread(rt.thread, NULL);
     rt.query = NULL;
     rt.starttime = 0;
     rt.thread = NULL;
-    if(restart) rt.thread = SDL_CreateThread(resolverloop, "rt", &rt);
+    if (restart) rt.thread = SDL_CreateThread(resolverloop, "rt", &rt);
     SDL_UnlockMutex(resolvermutex);
 }; 
 
@@ -171,7 +173,7 @@ void pingservers()
     loopv(servers)
     {
         serverinfo &si = servers[i];
-        if(si.address.host == ENET_HOST_ANY) continue;
+        if (in6_equal(si.address.host, ENET_HOST_ANY)) continue;
         p = ping;
         putint(p, lastmillis);
         buf.data = ping;
@@ -187,7 +189,7 @@ void checkresolver()
     ENetAddress addr = { ENET_HOST_ANY, CUBE_SERVINFO_PORT };
     while(resolvercheck(&name, &addr))
     {
-        if(addr.host == ENET_HOST_ANY) continue;
+        if (in6_equal(addr.host, ENET_HOST_ANY)) continue;
         loopv(servers)
         {
             serverinfo &si = servers[i];
@@ -216,7 +218,7 @@ void checkpings()
         loopv(servers)
         {
             serverinfo &si = servers[i];
-            if(addr.host == si.address.host)
+            if (in6_equal(addr.host, si.address.host))
             {
                 p = ping;
                 si.ping = lastmillis - getint(p);
@@ -250,14 +252,18 @@ void refreshservers()
     loopv(servers)
     {
         serverinfo &si = servers[i];
-        if(si.address.host != ENET_HOST_ANY && si.ping != 9999)
+        if (!in6_equal(si.address.host, ENET_HOST_ANY) && si.ping != 9999)
         {
             if(si.protocol!=PROTOCOL_VERSION) sprintf_s(si.full)("%s [different cube protocol]", si.name);
             else sprintf_s(si.full)("%d\t%d\t%s, %s: %s %s", si.ping, si.numplayers, si.map[0] ? si.map : "[unknown]", modestr(si.mode), si.name, si.sdesc);
         }
         else
         {
-            sprintf_s(si.full)(si.address.host != ENET_HOST_ANY ? "%s [waiting for server response]" : "%s [unknown host]\t", si.name);
+            sprintf_s(si.full, sizeof(si.full),
+                !in6_equal(si.address.host, ENET_HOST_ANY)
+                ? "%s [waiting for server response]"
+                : "%s [unknown host]\t",
+                si.name);
         }
         si.full[50] = 0; // cut off too long server descriptions
         menumanual(1, i, si.full);
@@ -294,7 +300,25 @@ COMMAND(updatefrommaster, ARG_NONE);
 
 void writeservercfg()
 {
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// relative path fix for PocketPC
+
+	wchar_t relpath[MAX_PATH];
+	char filepath[MAX_PATH];
+	int i;
+
+	GetModuleFileName(GetModuleHandle(NULL), relpath, MAX_PATH);
+	for(i = wcslen(relpath); i && relpath[i]!=L'\\'; i--);
+	relpath[i+1] = L'\0';
+	WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+	strcat(filepath, "servers.cfg");
+	FILE *f = fopen(filepath, "w");
+#else // End Intel Corporation code
     FILE *f = fopen("servers.cfg", "w");
+#endif /* _WIN32_WCE */
+
     if(!f) return;
     fprintf(f, "// servers connected to are added here automatically\n\n");
     loopvrev(servers) fprintf(f, "addserver %s\n", servers[i].name);

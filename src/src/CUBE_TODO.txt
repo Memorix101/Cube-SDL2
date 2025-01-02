@@ -1,37 +1,10 @@
-- seperate release archives for windows, linux, and macosx (less FAQs) - tar  with -keep empty dirs
-- demo play bugs like sticky scoreboard
-- look at that immortality bug that sometimes pops up.  immortality_bug.cdgz
-- kick vote
-- check other demos for common bugs
-- demo bug: LAG makes other player fly
-- demo bug: names (who is "you") can sometimes be reversed
-- ability to set refreshrate? http://twomix.devolution.com/pipermail/sdl/2003-July/055059.html
-- player should not be stuck moving after respawn (not reset +forward)
-- change auto wep change?
-- fps = (1000.0f/(curtime ? curtime : 1)+fps*50)/51  // somehow curtime gets to be 0 even if fps is only 150 on linux
-- make serverinfo in server port obey -i
-- make spawns more random
-- automatic team assignment 
-- configurable serverport
-- force respawn
-- delay for player in xhair
-- demo: if player once in lag mode, stays there
-- "texture triggers", i.e. triggers that can be set for the player touching a certain floor texture. That way it can support sky, and lava, the effects are customizable, and you can also create full-room triggers for other purposes with them.
-- -mBLAH sometimes still registers
-- lighting - store id of strongest light in every tile (or multiple lights) | normals | boundaries | occlusion at steps down <- the hard part, really needs different representation
-- spectator mode
-- maprotation.cfg for server
-- map checksum (detect architectural changes, entity changes(can it be done by just checking size?))
-- send/getmap: some way to send also the .cfg and neccesary custom stuff
-- Duel modes (for insta, ffa, tactics, efficiency) maybe with reasonable fraglimit each or only 3-5min rounds (others spectate)
-- ctf mode (or something else really team-oriented)
-- accuracy stats ;)
-- more gore/blood :D
-- more chars äüö, and ´
 - SLEEPY: only allow v121 and later
 - win98 gf2 video init crash?
 - better fist?
+- chmod solution? -> release as tar.gz
 - check with vtune for cpu bottlenecks on ksp1
+- put in scaling hack for sloppy ATI drivers
+- integrate new dcp pistol model/start weapon 
 - monsters & jumppads
 - hide monsters until triggered?
 - trigger when monsters die?
@@ -80,9 +53,11 @@
 - mapmodels above eachother gives incorrect physics
 - fps reporting on demos.../ teleport to spawn?
 - improve sounds
-- Ability to get attributes of a single cube at $xsel, $ysel. 
-- Ability to get the current users position (or cursor position, X,Y & height)
-- Provide Absolute mode in at least functions edittex,editheight,vdelta.
+#1 Ability to get attributes of a single cube at $xsel, $ysel. 
+#3 Ability to get the current users position (or cursor position, X,Y & height)
+#5 Provide Absolute mode in at least functions edittex,editheight,vdelta.
+
+check:
 - no text when dead? / round over while dead? -> more lag than appearent
 - can't spawn when 1 is lagging
 - sendmap hang?
@@ -92,13 +67,21 @@
 - bigger monsters can get stuck on top of mapmodels
 - disable hudgun when dead
 - make disconnection faster (now can last up to 60 secs)... what features depend on this?
+
+
+TODO:
+=====
+recent stuff:
 - try and debug depth read? GL_DEPTH_SCALE/GL_DEPTH_BIAS
 - detect if sw driver? glXIsDirect(dpy, ctx) (can't get context from SDL) / glGetString(GL_VENDOR/RENDERER) (many HW drivers use mesa as base)
+- make server port configurable?
 - not reproducable: When you pop out of edit mode where a bridge is right under a ceiling you get stuck.
+- Also, when you stay over a vertical jumppad it pushes you up by decreasing amounts and then after a few rounds of that it pushes you really high. That's not necessarily bad, but it is weird. 
 - jumppads don't work for monsters
 - try to go FMOD-only?
 - new weapon models?
 - profiling / replace gluBuild2DMipmaps, its too slow
+- maxplayers?
 - protocol: send map checksums so checking can happen?
 
 rendering:

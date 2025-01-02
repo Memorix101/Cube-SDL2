@@ -25,7 +25,7 @@ bool allowedittoggle()
     return allow; 
 };
 
-VARF(rate, 0, 0, 25000, if(clienthost && (!rate || rate>1000)) enet_host_bandwidth_limit (clienthost, rate, rate));
+VARF(rate, 0, 0, 25000, if(clienthost) enet_host_bandwidth_limit (clienthost, rate, rate));
 
 void throttle();
 
@@ -46,21 +46,16 @@ void newteam(char *name) { c2sinit = false; strn0cpy(player1->team, name, 5); };
 COMMANDN(team, newteam, ARG_1STR);
 COMMANDN(name, newname, ARG_1STR);
 
-void writeclientinfo(FILE *f)
-{
-    fprintf(f, "name \"%s\"\nteam \"%s\"\n", player1->name, player1->team);
-};
-
 void connects(char *servername)
 {   
     disconnect(1);  // reset state
     addserver(servername);
 
-    conoutf("attempting to connect to %s", servername);
+    conoutf("attempting to connect to %s", (int)servername);
     ENetAddress address = { ENET_HOST_ANY, CUBE_SERVER_PORT };
     if(enet_address_set_host(&address, servername) < 0)
     {
-        conoutf("could not resolve server %s", servername);
+        conoutf("could not resolve server %s", (int)servername);
         return;
     };
 
@@ -131,8 +126,8 @@ void trydisconnect()
 };
 
 string ctext;
-void toserver(char *text) { conoutf("%s:\f %s", player1->name, text); strn0cpy(ctext, text, 80); };
-void echo(char *text) { conoutf("%s", text); };
+void toserver(char *text) { conoutf("%s:\f %s", (int)player1->name, (int)text); strn0cpy(ctext, text, 80); };
+void echo(char *text) { conoutf("%s", (int)text); };
 
 COMMAND(echo, ARG_VARI);
 COMMANDN(say, toserver, ARG_VARI);
@@ -147,7 +142,6 @@ void addmsg(int rel, int num, int type, ...)
 {
     if(demoplayback) return;
     if(num!=msgsizelookup(type)) { sprintf_sd(s)("inconsistant msg size for %d (%d != %d)", type, num, msgsizelookup(type)); fatal(s); };
-    if(messages.length()==100) { conoutf("command flood protection (type %d)", type); return; };
     ivector &msg = messages.add();
     msg.add(num);
     msg.add(rel);

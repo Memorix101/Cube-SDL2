@@ -1,5 +1,7 @@
 // implementation of generic tools
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "tools.h"
 #include <new>
 
@@ -12,7 +14,7 @@ pool::pool()
     for(int i = 0; i<MAXBUCKETS; i++) reuse[i] = NULL;
 };
 
-void *pool::alloc(size_t size)
+void *pool::alloc(int size)
 {
     if(size>MAXREUSESIZE)
     {
@@ -39,7 +41,7 @@ void *pool::alloc(size_t size)
     };
 };
 
-void pool::dealloc(void *p, size_t size)
+void pool::dealloc(void *p, int size)
 {
     if(size>MAXREUSESIZE)
     {
@@ -56,7 +58,7 @@ void pool::dealloc(void *p, size_t size)
     };
 };
 
-void *pool::realloc(void *p, size_t oldsize, size_t newsize)
+void *pool::realloc(void *p, int oldsize, int newsize)
 {
     void *np = alloc(newsize);
     if(!oldsize) return np;
@@ -74,7 +76,7 @@ void pool::dealloc_block(void *b)
     };
 }
 
-void pool::allocnext(size_t allocsize)
+void pool::allocnext(int allocsize)
 {
     char *b = (char *)malloc(allocsize+PTRSIZE);
     *((char **)b) = blocks;
@@ -83,7 +85,7 @@ void pool::allocnext(size_t allocsize)
     left = allocsize;
 };
 
-char *pool::string(char *s, size_t l)
+char *pool::string(char *s, int l)
 {
     char *b = (char *)alloc(l+1);
     strncpy(b,s,l);
@@ -108,7 +110,25 @@ char *path(char *s)
 
 char *loadfile(char *fn, int *size)
 {
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// relative path fix for PocketPC
+
+	wchar_t relpath[MAX_PATH];
+	char filepath[MAX_PATH];
+	int i;
+
+	GetModuleFileName(GetModuleHandle(NULL), relpath, MAX_PATH);
+	for(i = wcslen(relpath); i && relpath[i]!=L'\\'; i--);
+	relpath[i+1] = L'\0';
+	WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+	strcat(filepath, fn);
+	FILE *f = fopen(filepath, "rb");
+#else // End Intel Corporation code
     FILE *f = fopen(fn, "rb");
+#endif /* _WIN32_WCE */
+
     if(!f) return NULL;
     fseek(f, 0, SEEK_END);
     int len = ftell(f);
@@ -116,7 +136,7 @@ char *loadfile(char *fn, int *size)
     char *buf = (char *)malloc(len+1);
     if(!buf) return NULL;
     buf[len] = 0;
-    size_t rlen = fread(buf, 1, len, f);
+    int rlen = fread(buf, 1, len, f);
     fclose(f);
     if(len!=rlen || len<=0) 
     {

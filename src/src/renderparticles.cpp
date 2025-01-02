@@ -1,5 +1,7 @@
 // renderparticles.cpp
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
 const int MAXPARTICLES = 10500;
@@ -8,7 +10,7 @@ struct particle { vec o, d; int fade, type; int millis; particle *next; };
 particle particles[MAXPARTICLES], *parlist = NULL, *parempty = NULL;
 bool parinit = false;
 
-VARP(maxparticles, 100, 2000, MAXPARTICLES-500);
+VAR(maxparticles, 100, 2000, MAXPARTICLES-500);
 
 void newparticle(vec &o, vec &d, int fade, int type)
 {
@@ -36,7 +38,7 @@ void newparticle(vec &o, vec &d, int fade, int type)
 };
 
 VAR(demotracking, 0, 0, 1);
-VARP(particlesize, 20, 100, 500); 
+VAR(particlesize, 20, 100, 500); 
 
 vec right, up;
 
@@ -75,7 +77,40 @@ void render_particles(int time)
         parttype *pt = &parttypes[p->type];
 
         glBindTexture(GL_TEXTURE_2D, pt->tex);  
-        glBegin(GL_QUADS);
+      
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+		float sz = pt->sz*particlesize/100.0f;
+
+		// GL_QUADS to GL_TRIANGLES
+		GLfixed vertexarray[] = { f2x(p->o.x+(-right.x+up.x)*sz), f2x(p->o.z+(-right.y+up.y)*sz), f2x(p->o.y+(-right.z+up.z)*sz),
+								  f2x(p->o.x+( right.x+up.x)*sz), f2x(p->o.z+( right.y+up.y)*sz), f2x(p->o.y+( right.z+up.z)*sz),
+								  f2x(p->o.x+( right.x-up.x)*sz), f2x(p->o.z+( right.y-up.y)*sz), f2x(p->o.y+( right.z-up.z)*sz),
+								  f2x(p->o.x+(-right.x+up.x)*sz), f2x(p->o.z+(-right.y+up.y)*sz), f2x(p->o.y+(-right.z+up.z)*sz),
+								  f2x(p->o.x+( right.x-up.x)*sz), f2x(p->o.z+( right.y-up.y)*sz), f2x(p->o.y+( right.z-up.z)*sz),
+								  f2x(p->o.x+(-right.x-up.x)*sz), f2x(p->o.z+(-right.y-up.y)*sz), f2x(p->o.y+(-right.z-up.z)*sz) };
+
+		GLfixed texarray[] = { 0, ONE_FX,
+							   ONE_FX, ONE_FX,
+							   ONE_FX, 0,
+							   0, ONE_FX,
+							   ONE_FX, 0,
+							   0, 0 };
+
+		glColor4x(f2x(pt->r), f2x(pt->g), f2x(pt->b), ONE_FX);
+
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+		glVertexPointer(3, GL_FIXED, 0, vertexarray);
+		glTexCoordPointer(2, GL_FIXED, 0, texarray);
+
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+#else // End Intel Corporation code
+		glBegin(GL_QUADS);
         
         glColor3d(pt->r, pt->g, pt->b);
         float sz = pt->sz*particlesize/100.0f; 
@@ -85,6 +120,7 @@ void render_particles(int time)
         glTexCoord2f(1.0, 0.0); glVertex3d(p->o.x+( right.x-up.x)*sz, p->o.z+( right.y-up.y)*sz, p->o.y+( right.z-up.z)*sz);
         glTexCoord2f(0.0, 0.0); glVertex3d(p->o.x+(-right.x-up.x)*sz, p->o.z+(-right.y-up.y)*sz, p->o.y+(-right.z-up.z)*sz);
         glEnd();
+#endif /* _WIN32_WCE */
         xtraverts += 4;
 
         if(numrender++>maxparticles || (p->fade -= time)<0)

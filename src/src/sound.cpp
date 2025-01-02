@@ -1,71 +1,140 @@
 // sound.cpp: uses fmod on windows and sdl_mixer on unix (both had problems on the other platform)
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
-VARP(soundvol, 0, 255, 255);
-VARP(musicvol, 0, 128, 255);
-bool nosound = false;
+//#ifndef WIN32
+#define USE_MIXER
+//#endif
 
-#define MAXCHAN 32
-#define SOUNDFREQ 22050
+#ifdef _WIN32_WCE
+#undef USE_MIXER // use fmod for ppc
+#endif
 
-struct soundloc { vec loc; bool inuse; } soundlocs[MAXCHAN];
+VAR(soundvol, 0, 255, 255);
+VAR(musicvol, 0, 128, 255);
 
+#ifdef USE_MIXER
     #include "SDL_mixer.h"
     #define MAXVOL MIX_MAX_VOLUME
     Mix_Music *mod = NULL;
-    void *stream = NULL;
-
+    void *stream = NULL;    // TODO
+#else
+    #include "fmod.h"
+    #define MAXVOL 255
+    FMUSIC_MODULE *mod = NULL;
+    FSOUND_STREAM *stream = NULL;
+#endif
 
 void stopsound()
 {
-    if(nosound) return;
     if(mod)
     {
+        #ifdef USE_MIXER
             Mix_HaltMusic();
             Mix_FreeMusic(mod);
+        #else
+            FMUSIC_FreeSong(mod);
+        #endif
         mod = NULL;
     };
     if(stream)
     {
+        #ifndef USE_MIXER
+            FSOUND_Stream_Close(stream);
+        #endif
         stream = NULL;
     };
 };
 
-VAR(soundbufferlen, 128, 1024, 4096);
+void cleansound()
+{
+    stopsound();
+    #ifdef USE_MIXER
+        Mix_CloseAudio();
+    #else
+        FSOUND_Close();
+    #endif
+};
 
 void initsound()
 {
-    memset(soundlocs, 0, sizeof(soundloc)*MAXCHAN);
-        if(Mix_OpenAudio(SOUNDFREQ, MIX_DEFAULT_FORMAT, 2, soundbufferlen)<0)
+    #ifdef USE_MIXER
+        if(Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 512)<0)
         {
-            conoutf("sound init failed (SDL_mixer): %s", (size_t)Mix_GetError());
-            nosound = true;
+            conoutf("sound init failed (SDL_mixer): %s", (int) Mix_GetError());
+            soundvol = 0;
         };
-	    Mix_AllocateChannels(MAXCHAN);	
+    #else
+        if(FSOUND_GetVersion()<FMOD_VERSION) fatal("old FMOD dll");
+        if(!FSOUND_Init(22050, 32, FSOUND_INIT_GLOBALFOCUS))
+        {
+            conoutf("sound init failed (FMOD): %d", FSOUND_GetError());
+            soundvol = 0;
+        };
+    #endif
 };
 
 void music(char *name)
 {
-    if(nosound) return;
     stopsound();
     if(soundvol && musicvol)
     {
         string sn;
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+		// relative path fix for PocketPC
+
+		wchar_t relpath[MAX_PATH];
+		char filepath[MAX_PATH];
+		int i;
+
+		GetModuleFileName(GetModuleHandle(NULL), relpath, MAX_PATH);
+		for(i = wcslen(relpath); i && relpath[i]!=L'\\'; i--);
+		relpath[i+1] = L'\0';
+		WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+		strcpy_s(sn, filepath);
+		strcat_s(sn, "packages/");
+#else // End Intel Corporation code
         strcpy_s(sn, "packages/");
+#endif /* _WIN32_WCE */
+
         strcat_s(sn, name);
+        #ifdef USE_MIXER
             if(mod = Mix_LoadMUS(path(sn)))
             {
                 Mix_PlayMusic(mod, -1);
                 Mix_VolumeMusic((musicvol*MAXVOL)/255);
             };
+        #else
+            if(mod = FMUSIC_LoadSong(path(sn)))
+            {
+                FMUSIC_PlaySong(mod);
+                FMUSIC_SetMasterVolume(mod, musicvol);
+            }
+            else if(stream = FSOUND_Stream_Open(path(sn), FSOUND_LOOP_NORMAL, 0,0))
+            {
+                int chan = FSOUND_Stream_Play(FSOUND_FREE, stream);
+                if(chan>=0) { FSOUND_SetVolume(chan, (musicvol*MAXVOL)/255); FSOUND_SetPaused(chan, false); };
+            }
+            else
+            {
+                conoutf("could not play music: %s", (int)&sn);
+            };
+        #endif
     };
 };
 
 COMMAND(music, ARG_1STR);
 
+#ifdef USE_MIXER
 vector<Mix_Chunk *> samples;
-
+#else
+vector<FSOUND_SAMPLE *> samples;
+#endif
 
 cvector snames;
 
@@ -79,58 +148,12 @@ int registersound(char *name)
 
 COMMAND(registersound, ARG_1EST);
 
-void cleansound()
-{
-    if(nosound) return;
-    stopsound();
-        Mix_CloseAudio();
-};
-
-VAR(stereo, 0, 1, 1);
-
-void updatechanvol(int chan, vec *loc)
-{
-    int vol = soundvol, pan = 255/2;
-    if(loc)
-    {
-        vdist(dist, v, *loc, player1->o);
-        vol -= (int)(dist*3*soundvol/255); // simple mono distance attenuation
-        if(stereo && (v.x != 0 || v.y != 0))
-        {
-            float yaw = -atan2(v.x, v.y) - player1->yaw*(PI / 180.0f); // relative angle of sound along X-Y axis
-            pan = int(255.9f*(0.5*sin(yaw)+0.5f)); // range is from 0 (left) to 255 (right)
-        };
-    };
-    vol = (vol*MAXVOL)/255;
-        Mix_Volume(chan, vol);
-        Mix_SetPanning(chan, 255-pan, pan);
-};  
-
-void newsoundloc(int chan, vec *loc)
-{
-    assert(chan>=0 && chan<MAXCHAN);
-    soundlocs[chan].loc = *loc;
-    soundlocs[chan].inuse = true;
-};
-
-void updatevol()
-{
-    if(nosound) return;
-    loopi(MAXCHAN) if(soundlocs[i].inuse)
-    {
-            if(Mix_Playing(i))
-                updatechanvol(i, &soundlocs[i].loc);
-            else soundlocs[i].inuse = false;
-    };
-};
-
 void playsoundc(int n) { addmsg(0, 2, SV_SOUND, n); playsound(n); };
 
 int soundsatonce = 0, lastsoundmillis = 0;
 
 void playsound(int n, vec *loc)
 {
-    if(nosound) return;
     if(!soundvol) return;
     if(lastmillis==lastsoundmillis) soundsatonce++; else soundsatonce = 1;
     lastsoundmillis = lastmillis;
@@ -139,18 +162,54 @@ void playsound(int n, vec *loc)
 
     if(!samples[n])
     {
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+		string d;
+		
+		// relative path fix for PocketPC
+
+		wchar_t relpath[MAX_PATH];
+		char filepath[MAX_PATH];
+		int i;
+
+		GetModuleFileName(GetModuleHandle(NULL), relpath, MAX_PATH);
+		for(i = wcslen(relpath); i && relpath[i]!=L'\\'; i--);
+		relpath[i+1] = L'\0';
+		WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+		strcpy_s(d, filepath);
+		strcat_s(d, "packages/sounds/%s.wav");
+		sprintf_sd(buf)(d, snames[n]);
+#else // End Intel Corporation code
         sprintf_sd(buf)("packages/sounds/%s.wav", snames[n]);
+#endif /* _WIN32_WCE */
 
+        #ifdef USE_MIXER
             samples[n] = Mix_LoadWAV(path(buf));
+        #else
+            samples[n] = FSOUND_Sample_Load(n, path(buf), FSOUND_NORMAL, 0, 0);
+        #endif
 
-        if(!samples[n]) { conoutf("failed to load sample: %s", buf); return; };
+        if(!samples[n]) { conoutf("failed to load sample: %s", (int)&buf); return; };
     };
+    int vol = soundvol;
+    if(loc)
+    {
+        vdist(d, v, *loc, player1->o);
+        vol -= (int)(d*3*soundvol/255);     // simple mono distance attenuation
+    }
+    if(vol<=0) return;
 
+    #ifdef USE_MIXER
         int chan = Mix_PlayChannel(-1, samples[n], 0);
-    if(chan<0) return;
-    if(loc) newsoundloc(chan, loc);
-    updatechanvol(chan, loc);
+        if(chan>=0) Mix_Volume(chan, (vol*MAXVOL)/255);
+    #else
+        int chan = FSOUND_PlaySoundEx(FSOUND_FREE, samples[n], NULL, true);
+        if(chan>=0) { FSOUND_SetVolume(chan, (vol*MAXVOL)/255); FSOUND_SetPaused(chan, false); };
+    #endif
 };
 
 void sound(int n) { playsound(n, NULL); };
 COMMAND(sound, ARG_1INT);
+

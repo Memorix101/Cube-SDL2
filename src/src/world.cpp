@@ -131,9 +131,7 @@ void remip(block &b, int level)
             {
                 if(o[0]->vdelta-o[1]->vdelta != o[1]->vdelta-SWS(w,x+2,y,ws)->vdelta
                 || o[0]->vdelta-o[2]->vdelta != o[2]->vdelta-SWS(w,x+2,y+2,ws)->vdelta
-                || o[0]->vdelta-o[3]->vdelta != o[3]->vdelta-SWS(w,x,y+2,ws)->vdelta
-                || o[3]->vdelta-o[2]->vdelta != o[2]->vdelta-SWS(w,x+2,y+1,ws)->vdelta
-                || o[1]->vdelta-o[2]->vdelta != o[2]->vdelta-SWS(w,x+1,y+2,ws)->vdelta) goto c;
+                || o[0]->vdelta-o[3]->vdelta != o[3]->vdelta-SWS(w,x,y+2,ws)->vdelta) goto c;
             };
         };
         { loopi(4) if(o[i]->defer) goto c; };               // if any of the constituents is not perfect, then this one isn't either
@@ -146,16 +144,6 @@ void remip(block &b, int level)
     s.xs /= 2;
     s.ys /= 2;
     remip(s, level+1);
-};
-
-void remipmore(block &b, int level)
-{
-    block bb = b;
-    if(bb.x>1) bb.x--;
-    if(bb.y>1) bb.y--;
-    if(bb.xs<ssize-3) bb.xs++;
-    if(bb.ys<ssize-3) bb.ys++;
-    remip(bb, level);
 };
 
 int closestent()        // used for delent and edit mode ent display
@@ -196,7 +184,7 @@ void delent()
     int e = closestent();
     if(e<0) { conoutf("no more entities"); return; };
     int t = ents[e].type;
-    conoutf("%s entity deleted", entnames[t]);
+    conoutf("%s entity deleted", (int)entnames[t]);
     ents[e].type = NOTUSED;
     addmsg(1, 10, SV_EDITENT, e, NOTUSED, 0, 0, 0, 0, 0, 0, 0);
     if(t==LIGHT) calclight();
@@ -205,7 +193,7 @@ void delent()
 int findtype(char *what)
 {
     loopi(MAXENTTYPES) if(strcmp(what, entnames[i])==0) return i;
-    conoutf("unknown entity type \"%s\"", what);
+    conoutf("unknown entity type \"%s\"", (int)what);
     return NOTUSED;
 }
 

@@ -17,7 +17,6 @@ struct client                   // server side version of "dynent" type
 
 vector<client> clients;
 
-int maxclients = 8;
 string smapname;
 
 struct server_entity            // server side version of "entity" type
@@ -45,7 +44,7 @@ bool mapreload = false;
 
 char *serverpassword = "";
 
-bool isdedicated;
+bool listenserv;
 ENetHost * serverhost = NULL;
 int bsend = 0, brec = 0, laststatus = 0, lastsec = 0;
 
@@ -111,9 +110,9 @@ void disconnect_client(int n, char *reason)
 
 void resetitems() { sents.setsize(0); notgotitems = true; };
 
-void pickup(uint i, int sec, int sender)         // server side item pickup, acknowledge first client that gets it
+void pickup(int i, int sec, int sender)         // server side item pickup, acknowledge first client that gets it
 {
-    if(i>=(uint)sents.length()) return;
+    if(i>=sents.length()) return;
     if(sents[i].spawned)
     {
         sents[i].spawned = false;
@@ -270,7 +269,6 @@ void send_welcome(int n)
     putint(p, PROTOCOL_VERSION);
     putint(p, smapname[0]);
     sendstring(serverpassword, p);
-    putint(p, clients.length()>maxclients);
     if(smapname[0])
     {
         putint(p, SV_MAPCHANGE);
@@ -333,7 +331,6 @@ void resetserverifempty()
 };
 
 int nonlocalclients = 0;
-int lastconnect = 0;
 
 void serverslice(int seconds, unsigned int timeout)   // main server update, called from cube main loop in sp, or dedicated server loop
 {
@@ -363,11 +360,11 @@ void serverslice(int seconds, unsigned int timeout)   // main server update, cal
 
     resetserverifempty();
     
-    if(!isdedicated) return;     // below is network only
+    if(!listenserv) return;     // below is network only
 
 	int numplayers = 0;
 	loopv(clients) if(clients[i].type!=ST_EMPTY) ++numplayers;
-	serverms(mode, numplayers, minremain, smapname, seconds, clients.length()>=maxclients);
+	serverms(mode, numplayers, minremain, smapname, seconds);
 
     if(seconds-laststatus>60)   // display bandwidth stats, useful for server ops
     {
@@ -380,44 +377,34 @@ void serverslice(int seconds, unsigned int timeout)   // main server update, cal
 
     ENetEvent event;
     if(enet_host_service(serverhost, &event, timeout) > 0)
+    switch(event.type)
     {
-        switch(event.type)
+        case ENET_EVENT_TYPE_CONNECT:
         {
-            case ENET_EVENT_TYPE_CONNECT:
-            {
-                client &c = addclient();
-                c.type = ST_TCPIP;
-                c.peer = event.peer;
-                c.peer->data = (void *)(&c-&clients[0]);
-                char hn[1024];
-                strcpy_s(c.hostname, (enet_address_get_host(&c.peer->address, hn, sizeof(hn))==0) ? hn : "localhost");
-                printf("client connected (%s)\n", c.hostname);
-                send_welcome(lastconnect = &c-&clients[0]);
-                break;
-            }
-            case ENET_EVENT_TYPE_RECEIVE:
-                brec += event.packet->dataLength;
-                process(event.packet, (int)event.peer->data); 
-                if(event.packet->referenceCount==0) enet_packet_destroy(event.packet);
-                break;
+            client &c = addclient();
+            c.type = ST_TCPIP;
+            c.peer = event.peer;
+            c.peer->data = (void *)(&c-&clients[0]);
+            char hn[1024];
+            strcpy_s(c.hostname, (enet_address_get_host(&c.peer->address, hn, sizeof(hn))==0) ? hn : "localhost");
+            printf("client connected (%s)\n", c.hostname);
+            send_welcome(&c-&clients[0]); 
+            break;
+        }
+        case ENET_EVENT_TYPE_RECEIVE:
+            brec += event.packet->dataLength;
+            process(event.packet, (int)event.peer->data); 
+            if(event.packet->referenceCount==0) enet_packet_destroy(event.packet);
+            break;
 
-            case ENET_EVENT_TYPE_DISCONNECT: 
-                if((int)event.peer->data<0) break;
-                printf("disconnected client (%s)\n", clients[(int)event.peer->data].hostname);
-                clients[(int)event.peer->data].type = ST_EMPTY;
-                send2(true, -1, SV_CDIS, (int)event.peer->data);
-                event.peer->data = (void *)-1;
-                break;
-        };
-        
-        if(numplayers>maxclients)   
-        {
-            disconnect_client(lastconnect, "maxclients reached");
-        };
+        case ENET_EVENT_TYPE_DISCONNECT: 
+            if((int)event.peer->data<0) break;
+            printf("disconnected client (%s)\n", clients[(int)event.peer->data].hostname);
+            clients[(int)event.peer->data].type = ST_EMPTY;
+            send2(true, -1, SV_CDIS, (int)event.peer->data);
+            event.peer->data = (void *)-1;
+            break;
     };
-    #ifndef WIN32
-        fflush(stdout);
-    #endif
 };
 
 void cleanupserver()
@@ -438,13 +425,12 @@ void localconnect()
     send_welcome(&c-&clients[0]); 
 };
 
-void initserver(bool dedicated, int uprate, char *sdesc, char *ip, char *master, char *passwd, int maxcl)
+void initserver(bool dedicated, bool l, int uprate, char *sdesc, char *ip, char *master, char *passwd)
 {
     serverpassword = passwd;
-    maxclients = maxcl;
-	servermsinit(master ? master : "wouter.fov120.com/cube/masterserver/", sdesc, dedicated);
+	servermsinit(master ? master : "wouter.fov120.com/cube/masterserver/", sdesc, l);
     
-    if(isdedicated = dedicated)
+    if(listenserv = l)
     {
         ENetAddress address = { ENET_HOST_ANY, CUBE_SERVER_PORT };
         if(*ip && enet_address_set_host(&address, ip)<0) printf("WARNING: server ip not resolved");
@@ -455,14 +441,15 @@ void initserver(bool dedicated, int uprate, char *sdesc, char *ip, char *master,
 
     resetserverifempty();
 
-    if(isdedicated)       // do not return, this becomes main loop
+    if(dedicated)       // do not return, this becomes main loop
     {
-        #ifdef WIN32
+        #ifndef _WIN32_WCE
+		// not supported in PocketPC
         SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
         #endif
         printf("dedicated server started, waiting for clients...\nCtrl-C to exit\n\n");
         atexit(cleanupserver);
         atexit(enet_deinitialize);
-        for(;;) serverslice(/*enet_time_get_sec()*/time(NULL), 5);
+        for(;;) serverslice(/*enet_time_get_sec()*//*time(NULL)*/GetTickCount()/1000, 5);
     };
 };

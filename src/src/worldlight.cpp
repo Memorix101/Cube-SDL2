@@ -1,5 +1,7 @@
 // worldlight.cpp
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
 extern bool hasoverbright;
@@ -12,15 +14,23 @@ void lightray(float bx, float by, persistent_entity &light)     // done in realt
     float ly = light.y+(rnd(21)-10)*0.1f;
     float dx = bx-lx;
     float dy = by-ly; 
-    float dist = (float)sqrt(dx*dx+dy*dy);
+    float dist = sqrtf(dx*dx+dy*dy);
     if(dist<1.0f) return;
     int reach = light.attr1;
     int steps = (int)(reach*reach*1.6f/dist); // can change this for speedup/quality?
     const int PRECBITS = 12;
     const float PRECF = 4096.0f;
     int x = (int)(lx*PRECF); 
-    int y = (int)(ly*PRECF); 
+    int y = (int)(ly*PRECF);
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// scale lights for the PDA screen
+	int l = (int)(light.attr2*2.0f)<<PRECBITS;
+#else // End Intel Corporation code
     int l = light.attr2<<PRECBITS;
+#endif /* _WIN32_WCE */
+
     int stepx = (int)(dx/(float)steps*PRECF);
     int stepy = (int)(dy/(float)steps*PRECF);
     int stepl = fast_f2nat(l/(float)steps); // incorrect: light will fade quicker if near edge of the world
@@ -93,7 +103,13 @@ void lightray(float bx, float by, persistent_entity &light)     // done in realt
         {
             sqr *s = S(x>>PRECBITS, y>>PRECBITS); 
             int light = l>>PRECBITS;
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+			if(light>s->r) s->r = s->g = s->b = (uchar)min(light, 255);
+#else // End Intel Corporation code
             if(light>s->r) s->r = s->g = s->b = (uchar)light;
+#endif /* _WIN32_WCE */
             if(SOLID(s)) return;
             x += stepx;
             y += stepy;
@@ -157,7 +173,7 @@ void calclight()
     setvar("fullbright", 0);
 };
 
-VARP(dynlight, 0, 16, 32);
+VAR(dynlight, 0, 16, 32);
 
 vector<block *> dlights;
 
@@ -176,7 +192,6 @@ void dodynlight(vec &vold, vec &v, int reach, int strength, dynent *owner)
     if(!reach) reach = dynlight;
     if(owner->monsterstate) reach = reach/2;
     if(!reach) return;
-    if(v.x<0 || v.y<0 || v.x>ssize || v.y>ssize) return;
     
     int creach = reach+16;  // dependant on lightray random offsets!
     block b = { (int)v.x-creach, (int)v.y-creach, creach*2+1, creach*2+1 };
@@ -208,7 +223,7 @@ void blockpaste(block &b)
 {
     sqr *q = (sqr *)((&b)+1);
     for(int x = b.x; x<b.xs+b.x; x++) for(int y = b.y; y<b.ys+b.y; y++) *S(x,y) = *q++;
-    remipmore(b);
+    remip(b);
 };
 
 

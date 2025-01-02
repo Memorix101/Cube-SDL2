@@ -9,7 +9,7 @@ extern string clientpassword;
 
 void neterr(char *s)
 {
-    conoutf("illegal network message (%s)", s);
+    conoutf("illegal network message (%s)", (int)s);
     disconnect();
 };
 
@@ -35,7 +35,7 @@ void updatepos(dynent *d)
     const float dy = player1->o.y-d->o.y;
     const float dz = player1->o.z-d->o.z;
     const float rz = player1->aboveeye+d->eyeheight;
-    const float fx = (float)fabs(dx), fy = (float)fabs(dy), fz = (float)fabs(dz);
+    const float fx = (float)fabsf(dx), fy = (float)fabsf(dy), fz = (float)fabsf(dz);
     if(fx<r && fy<r && fz<rz && d->state!=CS_DEAD)
     {
         if(fx<fy) d->o.y += dy<0 ? r-fy : -(r-fy);  // push aside
@@ -83,10 +83,6 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
                 disconnect();
                 return;
             };
-            if(getint(p)==1)
-            {
-                conoutf("server is FULL, disconnecting..");
-            };
             break;
         };
 
@@ -122,7 +118,7 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
 
         case SV_TEXT:
             sgetstr();
-            conoutf("%s:\f %s", d->name, text); 
+            conoutf("%s:\f %s", (int)d->name, (int)&text); 
             break;
 
         case SV_MAPCHANGE:     
@@ -154,12 +150,12 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
             if(d->name[0])          // already connected
             {
                 if(strcmp(d->name, text))
-                    conoutf("%s is now known as %s", d->name, text);
+                    conoutf("%s is now known as %s", (int)d->name, (int)&text);
             }
             else                    // new client
             {
                 c2sinit = false;    // send new players my info again 
-                conoutf("connected: %s", text);
+                conoutf("connected: %s", (int)&text);
             }; 
             strcpy_s(d->name, text);
             sgetstr();
@@ -171,7 +167,7 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
         case SV_CDIS:
             cn = getint(p);
             if(!(d = getclient(cn))) break;
-			conoutf("player %s disconnected", d->name[0] ? d->name : "[incompatible client]"); 
+			conoutf("player %s disconnected", (int)(d->name[0] ? d->name : "[incompatible client]")); 
             zapdynent(players[cn]);
             break;
 
@@ -205,7 +201,7 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
             int actor = getint(p);
             if(actor==cn)
             {
-                conoutf("%s suicided", d->name);
+                conoutf("%s suicided", (int)d->name);
             }
             else if(actor==clientnum)
             {
@@ -213,12 +209,12 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
                 if(isteam(player1->team, d->team))
                 {
                     frags = -1;
-                    conoutf("you fragged a teammate (%s)", d->name);
+                    conoutf("you fragged a teammate (%s)", (int)d->name);
                 }
                 else
                 {
                     frags = 1;
-                    conoutf("you fragged %s", d->name);
+                    conoutf("you fragged %s", (int)d->name);
                 };
                 addmsg(1, 2, SV_FRAGS, player1->frags += frags);
             }
@@ -229,11 +225,11 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
                 {
                     if(isteam(a->team, d->name))
                     {
-                        conoutf("%s fragged his teammate (%s)", a->name, d->name);
+                        conoutf("%s fragged his teammate (%s)", (int)a->name, (int)d->name);
                     }
                     else
                     {
-                        conoutf("%s fragged %s", a->name, d->name);
+                        conoutf("%s fragged %s", (int)a->name, (int)d->name);
                     };
                 };
             };
@@ -253,9 +249,9 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
 
         case SV_ITEMSPAWN:
         {
-            uint i = getint(p);
+            int i = getint(p);
             setspawn(i, true);
-            if(i>=(uint)ents.length()) break;
+            if(i>=ents.length()) break;
             vec v = { ents[i].x, ents[i].y, ents[i].z };
             playsound(S_ITEMSPAWN, &v); 
             break;
@@ -290,8 +286,8 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
 
         case SV_EDITENT:            // coop edit of ent
         {
-            uint i = getint(p);
-            while((uint)ents.length()<=i) ents.add().type = NOTUSED;
+            int i = getint(p);
+            while(ents.length()<=i) ents.add().type = NOTUSED;
             int to = ents[i].type;
             ents[i].type = getint(p);
             ents[i].x = getint(p);
@@ -329,7 +325,7 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
         case SV_RECVMAP:
         {
             sgetstr();
-            conoutf("received map \"%s\" from server, reloading..", text);
+            conoutf("received map \"%s\" from server, reloading..", (int)&text);
             int mapsize = getint(p);
             writemap(text, mapsize, p);
             p += mapsize;
@@ -339,7 +335,7 @@ void localservertoclient(uchar *buf, int len)   // processes any updates from th
         
         case SV_SERVMSG:
             sgetstr();
-            conoutf("%s", text);
+            conoutf("%s", (int)text);
             break;
 
         case SV_EXT:        // so we can messages without breaking previous clients/servers, if necessary

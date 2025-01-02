@@ -14,7 +14,6 @@ struct ident
     void (*fun)();      // ID_VAR, ID_COMMAND
     int narg;           // ID_VAR, ID_COMMAND
     char *action;       // ID_ALIAS
-    bool persist;
 };
 
 void itoa(char *s, int i) { sprintf_s(s)("%d", i); };
@@ -28,13 +27,13 @@ void alias(char *name, char *action)
     if(!b)
     {
         name = newstring(name);
-        ident b = { ID_ALIAS, name, 0, 0, 0, 0, 0, newstring(action), true };
+        ident b = { ID_ALIAS, name, 0, 0, 0, 0, 0, newstring(action) };
         idents->access(name, &b);
     }
     else
     {
         if(b->type==ID_ALIAS) b->action = exchangestr(b->action, action);
-        else conoutf("cannot redefine builtin %s with an alias", name);
+        else conoutf("cannot redefine builtin %s with an alias", (int)name);
     };
 };
 
@@ -42,10 +41,10 @@ COMMAND(alias, ARG_2STR);
 
 // variable's and commands are registered through globals, see cube.h
 
-int variable(char *name, int min, int cur, int max, int *storage, void (*fun)(), bool persist)
+int variable(char *name, int min, int cur, int max, int *storage, void (*fun)())
 {
     if(!idents) idents = new hashtable<ident>;
-    ident v = { ID_VAR, name, min, max, storage, fun, 0, 0, persist };
+    ident v = { ID_VAR, name, min, max, storage, fun, 0, 0 };
     idents->access(name, &v);
     return cur;
 };
@@ -63,7 +62,7 @@ char *getalias(char *name)
 bool addcommand(char *name, void (*fun)(), int narg)
 {
     if(!idents) idents = new hashtable<ident>;
-    ident c = { ID_COMMAND, name, 0, 0, 0, fun, narg, 0, false };
+    ident c = { ID_COMMAND, name, 0, 0, 0, fun, narg, 0 };
     idents->access(name, &c);
     return false;
 };
@@ -75,7 +74,6 @@ char *parseexp(char *&p, int right)             // parse any nested set of () or
     for(int brak = 1; brak; )
     {
         int c = *p++;
-        if(c=='\r') *(p-1) = ' ';               // hack
         if(c==left) brak++;
         else if(c==right) brak--;
         else if(!c) { p--; conoutf("missing \"%c\"", right); return NULL; };
@@ -119,7 +117,7 @@ char *lookup(char *n)                           // find value of ident reference
         case ID_VAR: string t; itoa(t, *(id->storage)); return exchangestr(n, t);
         case ID_ALIAS: return exchangestr(n, id->action);
     };
-    conoutf("unknown alias lookup: %s", n+1);
+    conoutf("unknown alias lookup: %s", (int)n+1);
     return n;
 };
 
@@ -151,7 +149,7 @@ int execute(char *p, bool isdown)               // all evaluation happens here, 
         if(!id)
         {
             val = ATOI(c);
-            if(!val && *c!='0') conoutf("unknown command: %s", c);
+            if(!val && *c!='0') conoutf("unknown command: %s", (int)c);
         }
         else switch(id->type)
         {
@@ -192,7 +190,7 @@ int execute(char *p, bool isdown)               // all evaluation happens here, 
             case ID_VAR:                        // game defined variabled 
                 if(isdown)
                 {
-                    if(!w[1][0]) conoutf("%s = %d", c, *id->storage);      // var with no value just prints its current value
+                    if(!w[1][0]) conoutf("%s = %d", (int)c, *id->storage);      // var with no value just prints its current value
                     else
                     {
                         if(id->min>id->max)
@@ -205,7 +203,7 @@ int execute(char *p, bool isdown)               // all evaluation happens here, 
                             if(i1<id->min || i1>id->max)
                             {
                                 i1 = i1<id->min ? id->min : id->max;                // clamp to valid range
-                                conoutf("valid range for %s is %d..%d", c, id->min, id->max);
+                                conoutf("valid range for %s is %d..%d", (int)c, id->min, id->max);
                             }
                             *id->storage = i1;
                         };
@@ -246,7 +244,7 @@ void complete(char *s)
         strcat_s(s, t);
     };
     if(!s[1]) return;
-    if(!completesize) { completesize = (int)strlen(s)-1; completeidx = 0; };
+    if(!completesize) { completesize = strlen(s)-1; completeidx = 0; };
     int idx = 0;
     enumerate(idents, ident *, id,
         if(strncmp(id->name, s+1, completesize)==0 && idx++==completeidx)
@@ -272,35 +270,8 @@ bool execfile(char *cfgfile)
 
 void exec(char *cfgfile)
 {
-    if(!execfile(cfgfile)) conoutf("could not read \"%s\"", cfgfile);
+    if(!execfile(cfgfile)) conoutf("could not read \"%s\"", (int)cfgfile);
 };
-
-void writecfg()
-{
-    FILE *f = fopen("config.cfg", "w");
-    if(!f) return;
-    fprintf(f, "// automatically written on exit, do not modify\n// delete this file to have defaults.cfg overwrite these settings\n// modify settings in game, or put settings in autoexec.cfg to override anything\n\n");
-    writeclientinfo(f);
-    fprintf(f, "\n");
-    enumerate(idents, ident *, id,
-        if(id->type==ID_VAR && id->persist)
-        {
-            fprintf(f, "%s %d\n", id->name, *id->storage);
-        };
-    );
-    fprintf(f, "\n");
-    writebinds(f);
-    fprintf(f, "\n");
-    enumerate(idents, ident *, id,
-        if(id->type==ID_ALIAS && !strstr(id->name, "nextmap_"))
-        {
-            fprintf(f, "alias \"%s\" [%s]\n", id->name, id->action);
-        };
-    );
-    fclose(f);
-};
-
-COMMAND(writecfg, ARG_NONE);
 
 // below the commands that implement a small imperative language. thanks to the semantics of
 // () and [] expressions, any control construct can be defined trivially.
@@ -359,5 +330,4 @@ int strcmpa(char *a, char *b) { return strcmp(a,b)==0; };  COMMANDN(strcmp, strc
 
 int rndn(int a)    { return a>0 ? rnd(a) : 0; };  COMMANDN(rnd, rndn, ARG_1EXP);
 
-int explastmillis() { return lastmillis; };  COMMANDN(millis, explastmillis, ARG_1EXP);
 

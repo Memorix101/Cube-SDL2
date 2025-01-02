@@ -9,10 +9,10 @@ bool editmode = false;
 
 block sel =
 {
-    variable("selx",  0, 0, 4096, &sel.x,  NULL, false),
-    variable("sely",  0, 0, 4096, &sel.y,  NULL, false),
-    variable("selxs", 0, 0, 4096, &sel.xs, NULL, false),
-    variable("selys", 0, 0, 4096, &sel.ys, NULL, false),
+    variable("selx",  0, 0, 4096, &sel.x,  NULL),
+    variable("sely",  0, 0, 4096, &sel.y,  NULL),
+    variable("selxs", 0, 0, 4096, &sel.xs, NULL),
+    variable("selys", 0, 0, 4096, &sel.ys, NULL),
 };
 
 int selh = 0;
@@ -121,7 +121,7 @@ void cursorupdate()                                     // called every frame fr
     if(OUTBORD(cx, cy)) return;
     sqr *s = S(cx,cy);
     
-    if(fabs(sheight(s,s,z)-z)>1)                        // selected wall
+    if(fabsf(sheight(s,s,z)-z)>1)                        // selected wall
     {
         x += x>player1->o.x ? 0.5f : -0.5f;             // find right wall cube
         y += y>player1->o.y ? 0.5f : -0.5f;
@@ -182,7 +182,7 @@ void cursorupdate()                                     // called every frame fr
 };
 
 vector<block *> undos;                                  // unlimited undo
-VARP(undomegs, 0, 1, 10);                                // bounded by n megs
+VAR(undomegs, 0, 1, 10);                                // bounded by n megs
 
 void pruneundos(int maxremain)                          // bound memory
 {
@@ -382,8 +382,7 @@ COMMAND(equalize, ARG_1INT);
 
 void setvdeltaxy(int delta, block &sel)
 {
-    loopselxy(s->vdelta = max(s->vdelta+delta, 0));
-    remipmore(sel);    
+    loopselxy(s->vdelta = max(s->vdelta+delta, 0));    
 };
 
 void setvdelta(int delta)
@@ -419,7 +418,6 @@ void arch(int sidedelta, int _a)
         sel.xs>sel.ys
             ? (archverts[sel.xs-1][x] + (y==0 || y==sel.ys-1 ? sidedelta : 0))
             : (archverts[sel.ys-1][y] + (x==0 || x==sel.xs-1 ? sidedelta : 0)));
-    remipmore(sel);
 };
 
 void slope(int xd, int yd)
@@ -431,7 +429,6 @@ void slope(int xd, int yd)
     sel.xs++;
     sel.ys++;
     loopselxy(s->vdelta = xd*x+yd*y+off);
-    remipmore(sel);
 };
 
 void perlin(int scale, int seed, int psize)
@@ -445,7 +442,7 @@ void perlin(int scale, int seed, int psize)
     perlinarea(sel, scale, seed, psize);
     sel.xs++;
     sel.ys++;
-    remipmore(sel);
+    remip(sel);
     sel.xs--;
     sel.ys--;
 };

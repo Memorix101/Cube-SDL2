@@ -1,11 +1,18 @@
 // monster.cpp: implements AI for single player monsters, currently client only
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
 dvector monsters;
 int nextmonster, spawnremain, numkilled, monstertotal, mtimestart;
 
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+VARF(skill, 1, 1, 10, conoutf("skill is not %d", skill)); // less monsters, so less lag
+#else // End Intel Corporation code
 VARF(skill, 1, 3, 10, conoutf("skill is now %d", skill));
+#endif /* _WIN32_WCE */
 
 dvector &getmonsters() { return monsters; };
 void restoremonsterstate() { loopv(monsters) if(monsters[i]->state==CS_DEAD) numkilled++; };        // for savegames
@@ -23,12 +30,12 @@ struct monstertype      // see docs for how these values modify behaviour
 monstertypes[NUMMONSTERTYPES] =
 {
     { GUN_FIREBALL,  15, 100, 3, 0,   100, 800, 1, 10, 10, S_PAINO, S_DIE1,   "an ogre",     "monster/ogro"    },
-    { GUN_CG,        18,  70, 2, 70,   10, 400, 2,  8,  9, S_PAINR, S_DEATHR, "a rhino",     "monster/rhino"   },
-    { GUN_SG,        14, 120, 1, 100, 300, 400, 4, 14, 14, S_PAINE, S_DEATHE, "ratamahatta", "monster/rat"     },
-    { GUN_RIFLE,     15, 200, 1, 80,  300, 300, 4, 18, 18, S_PAINS, S_DEATHS, "a slith",     "monster/slith"   },
-    { GUN_RL,        13, 500, 1, 0,   100, 200, 6, 24, 24, S_PAINB, S_DEATHB, "bauul",       "monster/bauul"   },
+    { GUN_CG,        18,  70, 2, 70,   10, 400, 2,  8,  8, S_PAINR, S_DEATHR, "a rhino",     "monster/rhino"   },
+    { GUN_SG,        13, 120, 1, 100, 300, 400, 4, 14, 14, S_PAINE, S_DEATHE, "ratamahatta", "monster/rat"     },
+    { GUN_RIFLE,     14, 200, 1, 80,  400, 300, 4, 18, 18, S_PAINS, S_DEATHS, "a slith",     "monster/slith"   },
+    { GUN_RL,        12, 500, 1, 0,   200, 200, 6, 24, 24, S_PAINB, S_DEATHB, "bauul",       "monster/bauul"   },
     { GUN_BITE,      22,  50, 3, 0,   100, 400, 1, 12, 15, S_PAINP, S_PIGGR2, "a hellpig",   "monster/hellpig" },
-    { GUN_ICEBALL,   12, 250, 1, 0,    10, 400, 6, 18, 18, S_PAINH, S_DEATHH, "a knight",    "monster/knight"  },
+    { GUN_ICEBALL,   11, 250, 1, 0,    10, 400, 6, 18, 18, S_PAINH, S_DEATHH, "a knight",    "monster/knight"  },
     { GUN_SLIMEBALL, 15, 100, 1, 0,   200, 400, 2, 13, 10, S_PAIND, S_DEATHD, "a goblin",    "monster/goblin"  },
 };
 
@@ -100,12 +107,14 @@ void monsterclear()     // called after map start of when toggling edit mode to 
     };
 };
 
-bool los(float lx, float ly, float lz, float bx, float by, float bz, vec &v) // height-correct line of sight for monster shooting/seeing
+bool los(float lx, float ly, float lz, float bx, float by, float bz, vec &v, bool player = false) // height-correct line of sight for monster shooting/seeing
 {
-    if(OUTBORD((int)lx, (int)ly) || OUTBORD((int)bx, (int)by)) return false;
+	// if using los for player depth testing, turn the early return off
+	if(!player)
+		if(OUTBORD((int)lx, (int)ly) || OUTBORD((int)bx, (int)by)) return false;
     float dx = bx-lx;
     float dy = by-ly; 
-    int steps = (int)(sqrt(dx*dx+dy*dy)/0.9);
+	int steps = (int)(sqrtf(dx*dx+dy*dy)/0.9);
     if(!steps) return false;
     float x = lx;
     float y = ly;
@@ -172,7 +181,7 @@ void monsteraction(dynent *m)           // main AI thinking routine, called ever
     };
 
     vdist(disttoenemy, vectoenemy, m->o, m->enemy->o);                         
-    m->pitch = atan2(m->enemy->o.z-m->o.z, disttoenemy)*180/PI;         
+    m->pitch = float(atan2(m->enemy->o.z-m->o.z, disttoenemy)*180/PI);         
 
     if(m->blocked)                                                              // special case: if we run into scenery
     {
@@ -184,7 +193,7 @@ void monsteraction(dynent *m)           // main AI thinking routine, called ever
         else if(m->trigger<lastmillis && (m->monsterstate!=M_HOME || !rnd(5)))  // search for a way around (common)
         {
             m->targetyaw += 180+rnd(180);                                       // patented "random walk" AI pathfinding (tm) ;)
-            transition(m, M_SEARCH, 1, 400, 1000);
+            transition(m, M_SEARCH, 1, 100, 1000);
         };
     };
     
@@ -203,7 +212,7 @@ void monsteraction(dynent *m)           // main AI thinking routine, called ever
             vec target;
             if(editmode || !enemylos(m, target)) return;   // skip running physics
             normalise(m, enemyyaw);
-            float angle = (float)fabs(enemyyaw-m->yaw);
+            float angle = (float)fabsf(enemyyaw-m->yaw);
             if(disttoenemy<8                   // the better the angle to the player, the further the monster can see/hear
             ||(disttoenemy<16 && angle<135)
             ||(disttoenemy<32 && angle<90)
@@ -325,7 +334,7 @@ void monsterthink()
             v.z += monsters[i]->eyeheight;
             vdist(dist, t, monsters[i]->o, v);
             v.z -= monsters[i]->eyeheight;
-            if(dist<4) teleport((int)(&e-&ents[0]), monsters[i]);
+            if(dist<4) teleport(&e-&ents[0], monsters[i]);
         };
     };
     

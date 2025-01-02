@@ -1,5 +1,7 @@
 // clientgame.cpp: core game related stuff
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
 int nextmode = 0;         // nextmode becomes gamemode after next map load
@@ -13,12 +15,12 @@ bool intermission = false;
 dynent *player1 = newdynent();          // our client
 dvector players;                        // other clients
 
-VARP(sensitivity, 0, 10, 10000);
-VARP(sensitivityscale, 1, 1, 10000);
-VARP(invmouse, 0, 0, 1);
+VAR(sensitivity, 0, 10, 1000);
+VAR(sensitivityscale, 1, 1, 100);
+VAR(invmouse, 0, 0, 1);
 
 int lastmillis = 0;
-int curtime = 10;
+int curtime;
 string clientmap;
 
 extern int framesinmap;
@@ -46,7 +48,7 @@ void spawnstate(dynent *d)              // reset player state not persistent acc
     d->armour = 50;
     d->armourtype = A_BLUE;
     d->quadmillis = 0;
-    d->lastattackgun = d->gunselect = GUN_SG;
+    d->gunselect = GUN_SG;
     d->gunwait = 0;
 	d->attacking = false;
     d->lastaction = 0;
@@ -167,7 +169,7 @@ void arenarespawn()
         if(dead>0 && (alive<=1 || (m_teammode && oneteam)))
         {
             conoutf("arena round is over! next round in 5 seconds...");
-            if(alive) conoutf("team %s is last man standing", lastteam);
+            if(alive) conoutf("team %s is last man standing", (int)lastteam);
             else conoutf("everyone died!");
             arenarespawnwait = lastmillis+5000;
             arenadetectwait  = lastmillis+10000;
@@ -198,28 +200,17 @@ void otherplayers()
     };
 };
 
-void respawn()
-{
-    if(player1->state==CS_DEAD)
-    { 
-        player1->attacking = false;
-        if(m_arena) { conoutf("waiting for new round to start..."); return; };
-        if(m_sp) { nextmode = gamemode; changemap(clientmap); return; };    // if we die in SP we try the same map again
-		respawnself();
-	};
-};
-
 int sleepwait = 0;
 string sleepcmd;
-void sleepf(char *msec, char *cmd) { sleepwait = atoi(msec)+lastmillis; strcpy_s(sleepcmd, cmd); };
-COMMANDN(sleep, sleepf, ARG_2STR);
+void sleep(char *msec, char *cmd) { sleepwait = atoi(msec)+lastmillis; strcpy_s(sleepcmd, cmd); };
+COMMAND(sleep, ARG_2STR);
 
 void updateworld(int millis)        // main game update loop
 {
     if(lastmillis)
     {     
         curtime = millis - lastmillis;
-        if(sleepwait && lastmillis>sleepwait) { sleepwait = 0; execute(sleepcmd); };
+        if(sleepwait && lastmillis>sleepwait) { execute(sleepcmd); sleepwait = 0; };
         physicsframe();
         checkquad(curtime);
 		if(m_arena) arenarespawn();
@@ -240,8 +231,7 @@ void updateworld(int millis)        // main game update loop
 				{
 					player1->move = player1->strafe = 0;
 					moveplayer(player1, 10, false);
-				}
-                else if(!m_arena && !m_sp && lastmillis-player1->lastaction>10000) respawn();
+				};
             }
             else if(!intermission)
             {
@@ -296,6 +286,17 @@ void spawnplayer(dynent *d)   // place at random spawn. also used by monsters!
     d->state = CS_ALIVE;
 };
 
+void respawn()
+{
+    if(player1->state==CS_DEAD)
+    { 
+        player1->attacking = false;
+        if(m_arena) { conoutf("waiting for new round to start..."); return; };
+        if(m_sp) { nextmode = gamemode; changemap(clientmap); return; };    // if we die in SP we try the same map again
+		respawnself();
+	};
+};
+
 // movement input code
 
 #define dir(name,v,d,s,os) void name(bool isdown) { player1->s = isdown; player1->v = isdown ? d : (player1->os ? -(d) : 0); player1->lastmove = lastmillis; };
@@ -334,9 +335,18 @@ void fixplayer1range()
 void mousemove(int dx, int dy)
 {
     if(player1->state==CS_DEAD || intermission) return;
-    const float SENSF = 33.0f;     // try match quake sens
-    player1->yaw += (dx/SENSF)*(sensitivity/(float)sensitivityscale);
-    player1->pitch -= (dy/SENSF)*(sensitivity/(float)sensitivityscale)*(invmouse ? -1 : 1);
+
+#ifdef _WIN32_WCE /* Begin Intel Corporation code */
+    const float SENSF = 5.0f;     // boost mouse sensitivity for stylus
+	if(abs(dx) <= 100 && abs(dy) <= 100) // gets rid of jerkies for stylus touching
+										 // screen far away from where it was before
+#else /* End Intel Corporation code */
+	const float SENSF = 33.0f;	// try match quake sens
+#endif /* _WIN32_WCE */
+    {
+		player1->yaw += (dx/SENSF)*(sensitivity/(float)sensitivityscale);
+		player1->pitch -= (dy/SENSF)*(sensitivity/(float)sensitivityscale)*(invmouse ? -1 : 1);
+	}
 	fixplayer1range();
 };
 
@@ -357,7 +367,7 @@ void selfdamage(int damage, int actor, dynent *act)
     {
         if(actor==-2)
         {
-            conoutf("you got killed by %s!", act->name);
+            conoutf("you got killed by %s!", (int)&act->name);
         }
         else if(actor==-1)
         {
@@ -372,11 +382,11 @@ void selfdamage(int damage, int actor, dynent *act)
             {
                 if(isteam(a->team, player1->team))
                 {
-                    conoutf("you got fragged by a teammate (%s)", a->name);
+                    conoutf("you got fragged by a teammate (%s)", (int)a->name);
                 }
                 else
                 {
-                    conoutf("you got fragged by %s", a->name);
+                    conoutf("you got fragged by %s", (int)a->name);
                 };
             };
         };
@@ -449,7 +459,7 @@ void startmap(char *name)   // called just after a map load
     showscores(false);
     intermission = false;
     framesinmap = 0;
-    conoutf("game mode is %s", modestr(gamemode));
+    conoutf("game mode is %s", (int)modestr(gamemode));
 }; 
 
 COMMANDN(map, changemap, ARG_1STR);

@@ -1,7 +1,9 @@
 // protos for ALL external functions in cube... 
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 // command
-extern int variable(char *name, int min, int cur, int max, int *storage, void (*fun)(), bool persist);
+extern int variable(char *name, int min, int cur, int max, int *storage, void (*fun)());
 extern void setvar(char *name, int i);
 extern int getvar(char *name);
 extern bool identexists(char *name);
@@ -13,14 +15,12 @@ extern void resetcomplete();
 extern void complete(char *s);
 extern void alias(char *name, char *action);
 extern char *getalias(char *name);
-extern void writecfg();
 
 // console
 extern void keypress(int code, bool isdown, int cooked);
 extern void renderconsole();
-extern void conoutf(const char *s, ...);
+extern void conoutf(const char *s, int a = 0, int b = 0, int c = 0);
 extern char *getcurcommand();
-extern void writebinds(FILE *f);
 
 // menus
 extern bool rendermenu();
@@ -38,18 +38,33 @@ extern void writeservercfg();
 // rendergl
 extern void gl_init(int w, int h);
 extern void cleangl();
-extern void gl_drawframe(int w, int h, float curfps);
+extern void gl_drawframe(int w, int h, float changelod, float curfps);
 extern bool installtex(int tnum, char *texname, int &xs, int &ys, bool clamp = false);
 extern void mipstats(int a, int b, int c);
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+extern void vertf(GLfixed v1, GLfixed v2, GLfixed v3, sqr *ls, GLfixed t1, GLfixed t2);
+#else // End Intel Corporation code
 extern void vertf(float v1, float v2, float v3, sqr *ls, float t1, float t2);
+#endif /* _WIN32_WCE */
+
 extern void addstrip(int tex, int start, int n);
 extern int lookuptexture(int tex, int &xs, int &ys);
 
 // rendercubes
 extern void resetcubes();
 extern void render_flat(int tex, int x, int y, int size, int h, sqr *l1, sqr *l2, sqr *l3, sqr *l4, bool isceil);
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+extern void render_flatdelta(int wtex, int x, int y, int size, GLfixed h1, GLfixed h2, GLfixed h3, GLfixed h4, sqr *l1, sqr *l2, sqr *l3, sqr *l4, bool isceil);
+extern void render_square(int wtex, GLfixed floor1, GLfixed floor2, GLfixed ceil1, GLfixed ceil2, int x1, int y1, int x2, int y2, int size, sqr *l1, sqr *l2, bool topleft);
+#else // End Intel Corporation code
 extern void render_flatdelta(int wtex, int x, int y, int size, float h1, float h2, float h3, float h4, sqr *l1, sqr *l2, sqr *l3, sqr *l4, bool isceil);
 extern void render_square(int wtex, float floor1, float floor2, float ceil1, float ceil2, int x1, int y1, int x2, int y2, int size, sqr *l1, sqr *l2, bool topleft);
+#endif /* _WIN32_WCE */
+
 extern void render_tris(int x, int y, int size, bool topleft, sqr *h1, sqr *h2, sqr *s, sqr *t, sqr *u, sqr *v);
 extern void addwaterquad(int x, int y, int size);
 extern int renderwater(float hf);
@@ -72,7 +87,6 @@ extern void initclientnet();
 extern bool netmapstart();
 extern int getclientnum();
 extern void changemapserv(char *name, int mode);
-extern void writeclientinfo(FILE *f);
 
 // clientgame
 extern void mousemove(int dx, int dy); 
@@ -101,7 +115,6 @@ extern void renderscores();
 extern void setupworld(int factor);
 extern void empty_world(int factor, bool force);
 extern void remip(block &b, int level = 0);
-extern void remipmore(block &b, int level = 0);
 extern int closestent();
 extern int findentity(int type, int index = 0);
 extern void trigger(int tag, int type, bool savegame);
@@ -117,11 +130,18 @@ extern block *blockcopy(block &b);
 extern void blockpaste(block &b);
 
 // worldrender
-extern void render_world(float vx, float vy, float vh, int yaw, int pitch, float widef, int w, int h);
+extern void render_world(float vx, float vy, float vh, float changelod, int yaw, int pitch, float widef, int w, int h);
+extern int lod_factor();
 
 // worldocull
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+extern void computeraytable(GLfixed vx, GLfixed vy);
+extern int isoccluded(GLfixed vx, GLfixed vy, GLfixed cx, GLfixed cy, GLfixed csize);
+#else // End Intel Corporation code
 extern void computeraytable(float vx, float vy);
 extern int isoccluded(float vx, float vy, float cx, float cy, float csize);
+#endif /* _WIN32_WCE */
 
 // main
 extern void fatal(char *s, char *o = "");
@@ -130,7 +150,7 @@ extern void keyrepeat(bool on);
 
 // rendertext
 extern void draw_text(char *str, int left, int top, int gl_num);
-extern void draw_textf(char *fstr, int left, int top, int gl_num, ...);
+extern void draw_textf(char *fstr, int left, int top, int gl_num, int arg);
 extern int text_width(char *str);
 extern void draw_envbox(int t, int fogdist);
 
@@ -185,7 +205,7 @@ extern void setentphysics(int mml, int mmr);
 extern void physicsframe();
 
 // sound
-extern void playsound(int n, vec *loc = 0);
+extern void playsound(int n, vec* loc = 0);
 extern void playsoundc(int n);
 extern void initsound();
 extern void cleansound();
@@ -195,7 +215,7 @@ extern void rendermodel(char *mdl, int frame, int range, int tex, float rad, flo
 extern mapmodelinfo &getmminfo(int i);
 
 // server
-extern void initserver(bool dedicated, int uprate, char *sdesc, char *ip, char *master, char *passwd, int maxcl);
+extern void initserver(bool dedicated, bool listen, int uprate, char *sdesc, char *ip, char *master, char *passwd);
 extern void cleanupserver();
 extern void localconnect();
 extern void localdisconnect();
@@ -208,7 +228,7 @@ extern void startintermission();
 extern void restoreserverstate(vector<entity> &ents);
 extern uchar *retrieveservers(uchar *buf, int buflen);
 extern char msgsizelookup(int msg);
-extern void serverms(int mode, int numplayers, int minremain, char *smapname, int seconds, bool isfull);
+extern void serverms(int mode, int numplayers, int minremain, char *smapname, int seconds);
 extern void servermsinit(const char *master, char *sdesc, bool listen);
 extern void sendmaps(int n, string mapname, int mapsize, uchar *mapdata);
 extern ENetPacket *recvmap(int n);
@@ -240,9 +260,10 @@ extern void checkitems();
 extern void realpickup(int n, dynent *d);
 extern void renderentities();
 extern void resetspawns();
-extern void setspawn(uint i, bool on);
+extern void setspawn(int i, bool on);
 extern void teleport(int n, dynent *d);
 extern void baseammo(int gun);
 
 // rndmap
 extern void perlinarea(block &b, int scale, int seed, int psize);
+

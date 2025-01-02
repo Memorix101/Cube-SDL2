@@ -6,11 +6,11 @@ ENetSocket mssock = ENET_SOCKET_NULL;
 
 void httpgetsend(ENetAddress &ad, char *hostname, char *req, char *ref, char *agent)
 {
-    if(ad.host==ENET_HOST_ANY)
+    if (in6_equal(ad.host, ENET_HOST_ANY))
     {
         printf("looking up %s...\n", hostname);
         enet_address_set_host(&ad, hostname);
-        if(ad.host==ENET_HOST_ANY) return;
+        if (in6_equal(ad.host, ENET_HOST_ANY)) return;
     };
     if(mssock!=ENET_SOCKET_NULL) enet_socket_destroy(mssock);
     mssock = enet_socket_create(ENET_SOCKET_TYPE_STREAM);
@@ -92,7 +92,7 @@ uchar *retrieveservers(uchar *buf, int buflen)
 ENetSocket pongsock = ENET_SOCKET_NULL;
 string serverdesc;
 
-void serverms(int mode, int numplayers, int minremain, char *smapname, int seconds, bool isfull)        
+void serverms(int mode, int numplayers, int minremain, char *smapname, int seconds)        
 {
     checkmasterreply();
     updatemasterserver(seconds);
@@ -114,10 +114,7 @@ void serverms(int mode, int numplayers, int minremain, char *smapname, int secon
         putint(p, mode);
         putint(p, numplayers);
         putint(p, minremain);
-        string mname;
-        strcpy_s(mname, isfull ? "[FULL] " : "");
-        strcat_s(mname, smapname);
-        sendstring(mname, p);
+        sendstring(smapname, p);
         sendstring(serverdesc, p);
         buf.dataLength = p - pong;
         enet_socket_send(pongsock, &addr, &buf, 1);

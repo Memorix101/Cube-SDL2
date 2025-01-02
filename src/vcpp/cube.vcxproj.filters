@@ -176,5 +176,8 @@
     <ClCompile Include="..\src\tools.cpp">
       <Filter>support</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\enet_implementation.cpp">
+      <Filter>support</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

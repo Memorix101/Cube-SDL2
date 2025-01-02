@@ -1,6 +1,15 @@
 // rendermd2.cpp: loader code adapted from a nehe tutorial
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+// storing verts in fixed is more efficient, but takes more space because of duplication
+struct vecfx { GLfixed x; GLfixed y; GLfixed z; };
+#endif /* _WIN32_WCE */
+// End Intel Corporation code
 
 struct md2_header
 {
@@ -37,6 +46,7 @@ struct md2
     int numVerts;
     char* frames;
     vec **mverts;
+
     int displaylist;
     int displaylistverts;
     
@@ -44,6 +54,13 @@ struct md2
     char *loadname;
     int mdlnum;
     bool loaded;
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// declaration must be here because of some direct memory access
+	vecfx **mvertsfx;
+#endif /* _WIN32_WCE */
+// End Intel Corporation code
 
     bool load(char* filename);
     void render(vec &light, int numFrame, int range, float x, float y, float z, float yaw, float pitch, float scale, float speed, int snap, int basetime);
@@ -60,13 +77,28 @@ struct md2
     }
 };
 
-
 bool md2::load(char* filename)
 {
-    FILE* file;
-    md2_header header;
+	FILE* file;
+	md2_header header;
 
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// relative path fix for Pocket PC
+	wchar_t relpath[MAX_PATH];
+	char filepath[MAX_PATH];
+	GetModuleFileName(GetModuleHandle(NULL),relpath,MAX_PATH);
+	for(int q=wcslen(relpath); q && relpath[q]!=L'\\';q--);
+	relpath[q+1]=L'\0';
+
+	WideCharToMultiByte(CP_ACP, 0, relpath, MAX_PATH, filepath, MAX_PATH, NULL, NULL);
+
+	strcat(filepath, filename);
+
+	if((file= fopen(filepath, "rb"))==NULL) return false;
+#else // End Intel Corporation code
     if((file= fopen(filename, "rb"))==NULL) return false;
+#endif /* _WIN32_WCE */
 
     fread(&header, sizeof(md2_header), 1, file);
     endianswap(&header, sizeof(int), sizeof(md2_header)/sizeof(int));
@@ -100,8 +132,15 @@ bool md2::load(char* filename)
 
     fclose(file);
     
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	mvertsfx = new vecfx*[numFrames];
+	mverts = new vec*[numFrames];
+	loopj(numFrames) { mverts[j] = NULL; mvertsfx[j] = NULL; }
+#else // End Intel Corporation code
     mverts = new vec*[numFrames];
     loopj(numFrames) mverts[j] = NULL;
+#endif /* _WIN32_WCE */
 
     return true;
 };
@@ -111,8 +150,16 @@ float snap(int sn, float f) { return sn ? (float)(((int)(f+sn*0.5f))&(~(sn-1))) 
 void md2::scale(int frame, float scale, int sn)
 {
     mverts[frame] = new vec[numVerts];
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	mvertsfx[frame] = new vecfx[numVerts];
+#endif /* _WIN32_WCE */
+// End Intel Corporation code
+
     md2_frame *cf = (md2_frame *) ((char*)frames+frameSize*frame);
     float sc = 16.0f/scale;
+
     loop(vi, numVerts)
     {
         uchar *cv = (uchar *)&cf->vertices[vi].vertex;
@@ -120,19 +167,120 @@ void md2::scale(int frame, float scale, int sn)
         v->x =  (snap(sn, cv[0]*cf->scale[0])+cf->translate[0])/sc;
         v->y = -(snap(sn, cv[1]*cf->scale[1])+cf->translate[1])/sc;
         v->z =  (snap(sn, cv[2]*cf->scale[2])+cf->translate[2])/sc;
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+        vecfx *w = &(mvertsfx[frame])[vi];
+        w->x = f2x(v->x);
+        w->y = f2x(v->y);
+        w->z = f2x(v->z);
+#endif /* _WIN32_WCE */
+// End Intel Corporation code
     };
 };
 
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+// fixed optimized md2 rendering routine
 void md2::render(vec &light, int frame, int range, float x, float y, float z, float yaw, float pitch, float sc, float speed, int snap, int basetime)
 {
     loopi(range) if(!mverts[frame+i]) scale(frame+i, sc, snap);
     
-    glPushMatrix ();
+	pushModelMatrix();
+	translate(modelview, f2x(x), f2x(y), f2x(z));
+    rotate(modelview, f2x(yaw+180), 0, i2x(-1), 0);
+	rotate(modelview, f2x(pitch), 0, 0, ONE_FX);
+  
+	glColor4x(f2x(light.x), f2x(light.y), f2x(light.z), ONE_FX);
+
+	displaylist = 0;
+
+    if(displaylist && frame==0 && range==1)
+    {
+		xtraverts += displaylistverts;
+    }
+    else
+    {
+		if(frame==0 && range==1)
+		{
+			static int displaylistn = 10;
+			displaylistverts = xtraverts;
+		};
+		
+		int time = lastmillis-basetime;
+		int fr1 = (int)(time/speed);
+		GLfixed frac1 = f2x((time-fr1*speed)/speed);
+		GLfixed frac2 = ONE_FX-frac1;
+		fr1 = fr1%range+frame;
+		int fr2 = fr1+1;
+		if(fr2>=frame+range) fr2 = frame;
+		vecfx *verts1 = mvertsfx[fr1];
+		vecfx *verts2 = mvertsfx[fr2];
+
+		// becomes a bug if using highly detailed models, but saves dynamic allocation
+		GLfixed vertexarray[200];
+		GLfixed texarray[200];
+
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glDisableClientState(GL_COLOR_ARRAY);
+
+		for(int *command = glCommands; (*command)!=0;)
+		{
+			int numVertex = *command++;
+
+			int n = numVertex;
+
+			if(numVertex < 0)
+				numVertex = -numVertex;
+
+			int i, j, k;
+			for(i=j=k = 0; i < numVertex; i++,j+=2,k+=3)
+			{
+				texarray[j] = f2x(*((float*)command++));
+				texarray[j+1] = f2x(*((float*)command++));
+				
+				int vn = *command++;
+				vecfx &v1 = verts1[vn];
+				vecfx &v2 = verts2[vn];
+				#define ip(c) MulFX(v1.c, frac2) + MulFX(v2.c, frac1)
+
+				vertexarray[k] = ip(x);
+				vertexarray[k+1] = ip(z);
+				vertexarray[k+2] = ip(y);
+			};
+			glVertexPointer(3, GL_FIXED, 0, vertexarray);
+			glTexCoordPointer(2, GL_FIXED, 0, texarray);
+			
+			if(n>0)
+				glDrawArrays(GL_TRIANGLE_STRIP, 0, numVertex);
+			else
+				glDrawArrays(GL_TRIANGLE_FAN, 0, numVertex);
+
+			xtraverts += numVertex;			
+		};
+
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		
+		if(displaylist)
+		{
+			displaylistverts = xtraverts-displaylistverts;
+		};
+	};
+	popModelMatrix();
+}
+#else // End Intel Corporation code
+void md2::render(vec &light, int frame, int range, float x, float y, float z, float yaw, float pitch, float sc, float speed, int snap, int basetime)
+{
+    loopi(range) if(!mverts[frame+i]) scale(frame+i, sc, snap);
+    
+	glPushMatrix ();
     glTranslatef(x, y, z);
     glRotatef(yaw+180, 0, -1, 0);
     glRotatef(pitch, 0, 0, 1);
     
-	glColor3fv((float *)&light);
+	glColor3fv((float *)&light);	
 
     if(displaylist && frame==0 && range==1)
     {
@@ -161,6 +309,7 @@ void md2::render(vec &light, int frame, int range, float x, float y, float z, fl
 		for(int *command = glCommands; (*command)!=0;)
 		{
 			int numVertex = *command++;
+			
 			if(numVertex>0) { glBegin(GL_TRIANGLE_STRIP); }
 			else            { glBegin(GL_TRIANGLE_FAN); numVertex = -numVertex; };
 
@@ -176,9 +325,10 @@ void md2::render(vec &light, int frame, int range, float x, float y, float z, fl
 				glVertex3f(ip(x), ip(z), ip(y));
 			};
 
-			xtraverts += numVertex;
-
 			glEnd();
+
+			xtraverts += numVertex;
+			
 		};
 		
 		if(displaylist)
@@ -187,9 +337,9 @@ void md2::render(vec &light, int frame, int range, float x, float y, float z, fl
 			displaylistverts = xtraverts-displaylistverts;
 		};
 	};
-
     glPopMatrix();
 }
+#endif /* _WIN32_WCE */
 
 hashtable<md2 *> *mdllookup = NULL;
 vector<md2 *> mapmodels;
@@ -209,6 +359,33 @@ void delayedload(md2 *m)
 };
 
 int modelnum = 0;
+
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+void reloadmodeltextures()
+{
+	md2 **mm = 0;
+	md2 *m = 0;
+	int xs, ys;
+
+	// step through all models and reload their textures if they were previously loaded
+	enumerate(mdllookup, md2 **, mm, 
+		{
+			m = *mm;
+
+			if(m->loaded)
+			{
+				//sprintf_sd(name1)("packages/models/%s/tris.md2", m->loadname);
+				//if(!m->load(path(name1))) fatal("loadmodel: ", name1);
+				sprintf_sd(name2)("packages/models/%s/skin.jpg", m->loadname);
+				installtex(FIRSTMDL+m->mdlnum, path(name2), xs, ys);
+			}
+		};
+	);
+	mm = 0;
+}
+#endif /* _WIN32_WCE */
+// End Intel Corporation code
 
 md2 *loadmodel(char *name)
 {
@@ -243,7 +420,13 @@ void rendermodel(char *mdl, int frame, int range, int tex, float rad, float x, f
 {
     md2 *m = loadmodel(mdl); 
     
-    if(isoccluded(player1->o.x, player1->o.y, x-rad, z-rad, rad*2)) return;
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+	// fixed point occlusion
+    if(isoccluded(f2x(player1->o.x), f2x(player1->o.y), f2x(x-rad), f2x(z-rad), f2x(rad*2))) return;
+#else // End Intel Corporation code
+	if(isoccluded(player1->o.x, player1->o.y, x-rad, z-rad, rad*2)) return;
+#endif /* _WIN32_WCE */
 
     delayedload(m);
     

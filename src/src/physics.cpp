@@ -3,21 +3,20 @@
 // they "felt right", and have no basis in reality. Collision detection is simplistic but
 // very robust (uses discrete steps at fixed fps).
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 
-bool plcollide(dynent *d, dynent *o, float &headspace, float &hi, float &lo) // collide with player or monster
+bool plcollide(dynent *d, dynent *o, float &headspace)          // collide with player or monster
 {
     if(o->state!=CS_ALIVE) return true;
     const float r = o->radius+d->radius;
-    if(fabs(o->o.x-d->o.x)<r && fabs(o->o.y-d->o.y)<r) 
+    if(fabsf(o->o.x-d->o.x)<r && fabsf(o->o.y-d->o.y)<r) 
     {
-        if(d->o.z-d->eyeheight<o->o.z-o->eyeheight) { if(o->o.z-o->eyeheight<hi) hi = o->o.z-o->eyeheight-1; }
-        else if(o->o.z+o->aboveeye>lo) lo = o->o.z+o->aboveeye+1;
-    
-        if(fabs(o->o.z-d->o.z)<o->aboveeye+d->eyeheight) return false;
+        if(fabsf(o->o.z-d->o.z)<o->aboveeye+d->eyeheight) return false;
         if(d->monsterstate) return false; // hack
         headspace = d->o.z-o->o.z-o->aboveeye-d->eyeheight;
-        if(headspace<0) headspace = 10;        
+        if(headspace<0) headspace = 10;
     };
     return true;
 };
@@ -40,28 +39,165 @@ bool cornertest(int mip, int x, int y, int dx, int dy, int &bx, int &by, int &bs
     return stest;
 };
 
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+// fixed point mmcollide, faster when no FPU is present
+void mmcollide(dynent *d, GLfixed &hi, GLfixed &lo)           // collide with a mapmodel
+{
+	GLfixed drad = f2x(d->radius);
+	GLfixed dox = f2x(d->o.x);
+	GLfixed doy = f2x(d->o.y);
+	GLfixed doz = f2x(d->o.z);
+	GLfixed deyeheight = f2x(d->eyeheight);
+
+	// faster to compare to zero
+    for(int i = ents.length()-1; i >= 0; i--)
+    {
+        if(ents[i].type!=MAPMODEL) continue;
+        mapmodelinfo &mmi = getmminfo(ents[i].attr2);
+        if(!&mmi || !mmi.h) continue;
+        const GLfixed r = i2x(mmi.rad)+drad;
+        if(absfx(i2x(ents[i].x)-dox)<r && absfx(i2x(ents[i].y)-doy)<r)
+        { 
+            GLfixed mmz = i2x((S(ents[i].x, ents[i].y)->floor+mmi.zoff+ents[i].attr3));
+            if(doz-deyeheight<mmz) { if(mmz<hi) hi = mmz; }
+            else if(mmz+i2x(mmi.h)>lo) lo = mmz+i2x(mmi.h);
+        };
+    };
+};
+#else // End Intel Corporation code
 void mmcollide(dynent *d, float &hi, float &lo)           // collide with a mapmodel
 {
-    loopv(ents)
+	loopv(ents)
     {
         entity &e = ents[i];
         if(e.type!=MAPMODEL) continue;
         mapmodelinfo &mmi = getmminfo(e.attr2);
         if(!&mmi || !mmi.h) continue;
         const float r = mmi.rad+d->radius;
-        if(fabs(e.x-d->o.x)<r && fabs(e.y-d->o.y)<r)
+        if(fabsf(e.x-d->o.x)<r && fabsf(e.y-d->o.y)<r)
         { 
-            float mmz = (float)(S(e.x, e.y)->floor+mmi.zoff+e.attr3);
+            float mmz = (float)(S(e.x, ents[i].y)->floor+mmi.zoff+e.attr3);
             if(d->o.z-d->eyeheight<mmz) { if(mmz<hi) hi = mmz; }
             else if(mmz+mmi.h>lo) lo = mmz+mmi.h;
         };
     };
 };
+#endif /* _WIN32_WCE */
 
 // all collision happens here
 // spawn is a dirty side effect used in spawning
 // drop & rise are supplied by the physics below to indicate gravity/push for current mini-timestep
 
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+// fixed point collide, faster when no FPU is present
+bool collide(dynent *d, bool spawn, float drop, float rise)
+{
+	const GLfixed dox = f2x(d->o.x);
+	const GLfixed doy = f2x(d->o.y);
+	const GLfixed doz = f2x(d->o.z);
+	const GLfixed drad = f2x(d->radius);
+	const GLfixed deye = f2x(d->eyeheight);
+	const GLfixed daboveeye = f2x(d->aboveeye);
+
+    const GLfixed fx1 = dox-drad;     // figure out integer cube rectangle this entity covers in map
+    const GLfixed fy1 = doy-drad;
+    const GLfixed fx2 = dox+drad;
+    const GLfixed fy2 = doy+drad;
+    const int x1 = x2i(fx1);
+    const int y1 = x2i(fy1);
+    const int x2 = x2i(fx2);
+    const int y2 = x2i(fy2);
+    GLfixed hi = i2x(127), lo = -ONETWENTYEIGHT_FX;
+    GLfixed minfloor = (d->monsterstate && !spawn && d->health>100) ? doz-deye-f2x(4.5f) : i2x(-1000);  // big monsters are afraid of heights, unless angry :)
+
+    for(int x = x1; x<=x2; x++) for(int y = y1; y<=y2; y++)     // collide with map
+    {
+        if(OUTBORD(x,y)) return false;
+        sqr *s = S(x,y);
+        GLfixed ceil = i2x(s->ceil);
+        GLfixed floor = i2x(s->floor);
+        switch(s->type)
+        {
+            case SOLID:
+                return false;
+
+            case CORNER:
+            {
+                int bx = x, by = y, bs = 1;
+				GLfixed bxfx = i2x(bx), byfx = i2x(by), bsfx = ONE_FX;
+                if(x==x1 && y==y1 && cornertest(0, x, y, -1, -1, bx, by, bs) && fx1-bxfx+fy1-byfx<=bsfx
+                || x==x2 && y==y1 && cornertest(0, x, y,  1, -1, bx, by, bs) && fx2-bxfx>=fy1-byfx
+                || x==x1 && y==y2 && cornertest(0, x, y, -1,  1, bx, by, bs) && fx1-bxfx<=fy2-byfx
+                || x==x2 && y==y2 && cornertest(0, x, y,  1,  1, bx, by, bs) && fx2-bxfx+fy2-byfx>=bsfx)
+                   return false;
+                break;
+            };
+
+            case FHF:       // FIXME: too simplistic collision with slopes, makes it feels like tiny stairs
+                floor -= DivFX(i2x(s->vdelta+S(x+1,y)->vdelta+S(x,y+1)->vdelta+S(x+1,y+1)->vdelta),SIXTEEN_FX,true);
+                break;
+
+            case CHF:
+                ceil += DivFX(i2x(s->vdelta+S(x+1,y)->vdelta+S(x,y+1)->vdelta+S(x+1,y+1)->vdelta),SIXTEEN_FX,true);
+
+        };
+        if(ceil<hi) hi = ceil;
+        if(floor>lo) lo = floor;
+        if(floor<minfloor) return false;   
+    };
+
+    if(hi-lo < deye+daboveeye) return false;
+
+    float headspace = 10;
+    loopv(players)       // collide with other players
+    {
+        dynent *o = players[i]; 
+        if(!o || o==d) continue;
+        if(!plcollide(d, o, headspace)) return false;
+    };
+    if(d!=player1) if(!plcollide(d, player1, headspace)) return false;
+    dvector &v = getmonsters();
+    // this loop can be a performance bottleneck with many monster on a slow cpu,
+    // should replace with a blockmap but seems mostly fast enough
+    loopv(v) if(!vreject(d->o, v[i]->o, 7.0f) && d!=v[i] && !plcollide(d, v[i], headspace)) return false; 
+    headspace -= 0.01f;
+    
+    mmcollide(d, hi, lo);    // collide with map models
+
+    if(spawn)
+    {
+        d->o.z = x2f(lo)+d->eyeheight;       // just drop to floor (sideeffect)
+        d->onfloor = true;
+    }
+    else
+    {
+        const float space = d->o.z-d->eyeheight-x2f(lo);
+        if(space<0)
+        {
+            if(space>-0.01) d->o.z = x2f(lo)+d->eyeheight;   // stick on step
+            else if(space>-1.26f) d->o.z += rise;       // rise thru stair
+            else return false;
+        }
+        else
+        {
+            d->o.z -= min(min(drop, space), headspace);       // gravity
+        };
+
+        const float space2 = x2f(hi)-(d->o.z+d->aboveeye);
+        if(space2<0)
+        {
+            if(space2<-0.1) return false;     // hack alert!
+            d->o.z = x2f(hi)-d->aboveeye;          // glue to ceiling
+            d->vel.z = 0;                     // cancel out jumping velocity
+        };
+
+        d->onfloor = d->o.z-d->eyeheight-x2f(lo)<0.01f;
+    };
+    return true;
+}
+#else // End Intel Corporation code
 bool collide(dynent *d, bool spawn, float drop, float rise)
 {
     const float fx1 = d->o.x-d->radius;     // figure out integer cube rectangle this entity covers in map
@@ -117,13 +253,13 @@ bool collide(dynent *d, bool spawn, float drop, float rise)
     {
         dynent *o = players[i]; 
         if(!o || o==d) continue;
-        if(!plcollide(d, o, headspace, hi, lo)) return false;
+        if(!plcollide(d, o, headspace)) return false;
     };
-    if(d!=player1) if(!plcollide(d, player1, headspace, hi, lo)) return false;
+    if(d!=player1) if(!plcollide(d, player1, headspace)) return false;
     dvector &v = getmonsters();
     // this loop can be a performance bottleneck with many monster on a slow cpu,
     // should replace with a blockmap but seems mostly fast enough
-    loopv(v) if(!vreject(d->o, v[i]->o, 7.0f) && d!=v[i] && !plcollide(d, v[i], headspace, hi, lo)) return false; 
+    loopv(v) if(!vreject(d->o, v[i]->o, 7.0f) && d!=v[i] && !plcollide(d, v[i], headspace)) return false; 
     headspace -= 0.01f;
     
     mmcollide(d, hi, lo);    // collide with map models
@@ -155,14 +291,15 @@ bool collide(dynent *d, bool spawn, float drop, float rise)
             d->vel.z = 0;                     // cancel out jumping velocity
         };
 
-        d->onfloor = d->o.z-d->eyeheight-lo<0.001f;
+        d->onfloor = d->o.z-d->eyeheight-lo<0.01f;
     };
     return true;
 }
+#endif /* _WIN32_WCE */
 
 float rad(float x) { return x*3.14159f/180; };
 
-VARP(maxroll, 0, 3, 20);
+VAR(maxroll, 0, 3, 20);
 
 int physicsfraction = 0, physicsrepeat = 0;
 const int MINFRAMETIME = 20; // physics always simulated at 50fps or better
@@ -300,7 +437,7 @@ void moveplayer(dynent *pl, int moveres, bool local, int curtime)
 
     if(pl->strafe==0) 
     {
-        pl->roll = pl->roll/(1+(float)sqrt((float)curtime)/25);
+        pl->roll = pl->roll/(1+sqrtf((float)curtime)/25);
     }
     else
     {

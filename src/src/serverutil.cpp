@@ -22,8 +22,11 @@ int getint(uchar *&p)
 
 void sendstring(char *t, uchar *&p)
 {
-    while(*t) putint(p, *t++);
-    putint(p, 0);
+    while(*t) 
+	{
+		putint(p, *t++);
+	}
+	putint(p, 0);
 };
 
 const char *modenames[] =
@@ -38,11 +41,11 @@ const char *modestr(int n) { return (n>=-2 && n<12) ? modenames[n+2] : "unknown"
 char msgsizesl[] =               // size inclusive message token, 0 for variable or not-checked sizes
 { 
     SV_INITS2C, 4, SV_INITC2S, 0, SV_POS, 12, SV_TEXT, 0, SV_SOUND, 2, SV_CDIS, 2,
-    SV_EDITH, 7, SV_EDITT, 7, SV_EDITS, 6, SV_EDITD, 6, SV_EDITE, 6,
     SV_DIED, 2, SV_DAMAGE, 4, SV_SHOT, 8, SV_FRAGS, 2,
+    SV_TIMEUP, 2, SV_EDITENT, 10, SV_MAPRELOAD, 2, SV_ITEMACC, 2,
     SV_MAPCHANGE, 0, SV_ITEMSPAWN, 2, SV_ITEMPICKUP, 3, SV_DENIED, 2,
     SV_PING, 2, SV_PONG, 2, SV_CLIENTPING, 2, SV_GAMEMODE, 2,
-    SV_TIMEUP, 2, SV_EDITENT, 10, SV_MAPRELOAD, 2, SV_ITEMACC, 2,
+    SV_EDITH, 7, SV_EDITT, 7, SV_EDITS, 6, SV_EDITD, 6, SV_EDITE, 6,
     SV_SENDMAP, 0, SV_RECVMAP, 1, SV_SERVMSG, 0, SV_ITEMLIST, 0,
     SV_EXT, 0,
     -1
@@ -95,7 +98,7 @@ void *alloc(int s) { void *b = calloc(1,s); if(!b) fatal("no memory!"); return b
 
 int main(int argc, char* argv[])
 {
-    int uprate = 0, maxcl = 4;
+    int uprate = 0;
     char *sdesc = "", *ip = "", *master = NULL, *passwd = "";
     
     for(int i = 1; i<argc; i++)
@@ -108,13 +111,12 @@ int main(int argc, char* argv[])
             case 'i': ip     = a; break;
             case 'm': master = a; break;
             case 'p': passwd = a; break;
-            case 'c': maxcl  = atoi(a); break;
             default: printf("WARNING: unknown commandline option\n");
         };
     };
     
     if(enet_initialize()<0) fatal("Unable to initialise network module");
-    initserver(true, uprate, sdesc, ip, master, passwd, maxcl);
+    initserver(true, true, uprate, sdesc, ip, master, passwd);
     return 0;
 };
 #endif

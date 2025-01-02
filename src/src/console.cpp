@@ -1,5 +1,7 @@
 // console.cpp: the console buffer, its display, and command line control
 
+// Portions copyright (c) 2005 Intel Corporation, all rights reserved
+
 #include "cube.h"
 #include <ctype.h>
 
@@ -38,14 +40,11 @@ void conline(const char *sf, bool highlight)        // add a line to the console
         strcpy_s(cl.cref, sf);
     };
     puts(cl.cref);
-    #ifndef WIN32
-        fflush(stdout);
-    #endif
 };
 
-void conoutf(const char *s, ...)
+void conoutf(const char *s, int a, int b, int c)
 {
-    sprintf_sdv(sf, s);
+    sprintf_sd(sf)(s, a, b, c);
     s = sf;
     int n = 0;
     while(strlen(s)>WORDWRAP)                       // cut strings to fit on screen
@@ -95,14 +94,14 @@ void bindkey(char *key, char *action)
         strcpy_s(keyms[i].action, action);
         return;
     };
-    conoutf("unknown key \"%s\"", key);   
+    conoutf("unknown key \"%s\"", (int)key);   
 };
 
 COMMANDN(bind, bindkey, ARG_2STR);
 
 void saycommand(char *init)                         // turns input to the command line on or off
 {
-   // SDL_EnableUNICODE(saycommandon = (init!=NULL));
+    //SDL_EnableUNICODE(saycommandon = (init!=NULL));
     if(!editmode) keyrepeat(saycommandon);
     if(!init) init = "";
     strcpy_s(commandbuf, init);
@@ -113,14 +112,14 @@ void mapmsg(char *s) { strn0cpy(hdr.maptitle, s, 128); };
 COMMAND(saycommand, ARG_VARI);
 COMMAND(mapmsg, ARG_1STR);
 
-#ifndef WIN32
+#if !defined(_WIN32_WCE) && !defined(WIN32)
 #include <X11/Xlib.h>
 #include <SDL_syswm.h>
-#endif
+#endif /* _WIN32_WCE && WIN32 */
 
 void pasteconsole()
 {
-    #ifdef WIN32
+    #if defined(WIN32) || defined(_WIN32_WCE)
     if(!IsClipboardFormatAvailable(CF_TEXT)) return; 
     if(!OpenClipboard(NULL)) return;
     char *cb = (char *)GlobalLock(GetClipboardData(CF_TEXT));
@@ -148,7 +147,7 @@ void pasteconsole()
         commandbuf[commandlen] = '\0';
     };
     XFree(cb);
-    #endif
+    #endif /* WIN32 || _WIN32_WCE */
 };
 
 cvector vhistory;
@@ -167,8 +166,34 @@ void history(int n)
 
 COMMAND(history, ARG_1INT);
 
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE
+// special exit combo needed for terminating an "unexitable" game
+vector<int> exitcombo;
+#endif /* _WIN32_WCE */
+// End Intel Corporation code
+
 void keypress(int code, bool isdown, int cooked)
 {
+// Begin Intel Corporation code
+#ifdef _WIN32_WCE 
+	// special exit code combination for shows, 31415 (ie PI in F buttons)
+	if(isdown)
+	{
+		if(code == SDLK_F4 && exitcombo.length() == 2)
+			exitcombo.add(code);
+		else if(code == SDLK_F1 && (exitcombo.length() == 1 || exitcombo.length() == 3))
+			exitcombo.add(code);
+		else if(code == SDLK_F3 && exitcombo.length() == 0)
+			exitcombo.add(code);
+		else if(code == SDLK_F5 && exitcombo.length() == 4)
+			quit();
+		else
+			exitcombo.setsize(0);
+	}
+#endif /* _WIN32_WCE */
+// End Intel Corporation code
+	
     if(saycommandon)                                // keystrokes go to commandline
     {
         if(isdown)
@@ -222,7 +247,12 @@ void keypress(int code, bool isdown, int cooked)
                 };
                 saycommand(NULL);
             }
+#ifdef _WIN32_WCE // Begin Intel Corporation code
+			// 3rd button is menu key
+			else if(code==SDLK_F3)
+#else // End Intel Corporation code
             else if(code==SDLK_ESCAPE)
+#endif /* _WIN32_WCE */
             {
                 saycommand(NULL);
             };
@@ -245,10 +275,3 @@ char *getcurcommand()
     return saycommandon ? commandbuf : NULL;
 };
 
-void writebinds(FILE *f)
-{
-    loopi(numkm)
-    {
-        if(*keyms[i].action) fprintf(f, "bind \"%s\" [%s]\n", keyms[i].name, keyms[i].action);
-    };
-};
