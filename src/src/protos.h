@@ -246,9 +246,3 @@ extern void baseammo(int gun);
 
 // rndmap
 extern void perlinarea(block &b, int scale, int seed, int psize);
-
-// game controller
-extern void gametest();
-extern void joypress(int code, bool isdown, int cooked);
-extern void add_controller(int id);
-extern void remove_controller(int id);
