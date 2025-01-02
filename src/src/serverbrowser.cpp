@@ -171,7 +171,7 @@ void pingservers()
     loopv(servers)
     {
         serverinfo &si = servers[i];
-        if(si.address.host == ENET_HOST_ANY) continue;
+        if (in6_equal(si.address.host, ENET_HOST_ANY)) continue;
         p = ping;
         putint(p, lastmillis);
         buf.data = ping;
@@ -187,7 +187,7 @@ void checkresolver()
     ENetAddress addr = { ENET_HOST_ANY, CUBE_SERVINFO_PORT };
     while(resolvercheck(&name, &addr))
     {
-        if(addr.host == ENET_HOST_ANY) continue;
+        if (in6_equal(addr.host, ENET_HOST_ANY)) continue;
         loopv(servers)
         {
             serverinfo &si = servers[i];
@@ -216,7 +216,7 @@ void checkpings()
         loopv(servers)
         {
             serverinfo &si = servers[i];
-            if(addr.host == si.address.host)
+            if (in6_equal(addr.host, si.address.host))
             {
                 p = ping;
                 si.ping = lastmillis - getint(p);
@@ -250,14 +250,18 @@ void refreshservers()
     loopv(servers)
     {
         serverinfo &si = servers[i];
-        if(si.address.host != ENET_HOST_ANY && si.ping != 9999)
+        if (!in6_equal(si.address.host, ENET_HOST_ANY) && si.ping != 9999)
         {
             if(si.protocol!=PROTOCOL_VERSION) sprintf_s(si.full)("%s [different cube protocol]", si.name);
             else sprintf_s(si.full)("%d\t%d\t%s, %s: %s %s", si.ping, si.numplayers, si.map[0] ? si.map : "[unknown]", modestr(si.mode), si.name, si.sdesc);
         }
         else
         {
-            sprintf_s(si.full)(si.address.host != ENET_HOST_ANY ? "%s [waiting for server response]" : "%s [unknown host]\t", si.name);
+            sprintf_s(si.full, sizeof(si.full),
+                !in6_equal(si.address.host, ENET_HOST_ANY)
+                ? "%s [waiting for server response]"
+                : "%s [unknown host]\t",
+                si.name);
         }
         si.full[50] = 0; // cut off too long server descriptions
         menumanual(1, i, si.full);

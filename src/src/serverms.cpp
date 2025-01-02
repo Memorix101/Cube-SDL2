@@ -6,11 +6,11 @@ ENetSocket mssock = ENET_SOCKET_NULL;
 
 void httpgetsend(ENetAddress &ad, char *hostname, char *req, char *ref, char *agent)
 {
-    if(ad.host==ENET_HOST_ANY)
+    if (in6_equal(ad.host, ENET_HOST_ANY))
     {
         printf("looking up %s...\n", hostname);
         enet_address_set_host(&ad, hostname);
-        if(ad.host==ENET_HOST_ANY) return;
+        if (in6_equal(ad.host, ENET_HOST_ANY)) return;
     };
     if(mssock!=ENET_SOCKET_NULL) enet_socket_destroy(mssock);
     mssock = enet_socket_create(ENET_SOCKET_TYPE_STREAM);
