@@ -5,9 +5,6 @@
       <UniqueIdentifier>{16ac048d-2c42-4b84-a3c1-785e5111a948}</UniqueIdentifier>
       <Extensions>h;hpp;hxx;hm;inl</Extensions>
     </Filter>
-    <Filter Include="headers\eneth">
-      <UniqueIdentifier>{56fd57d3-af26-414b-8322-5d667fc4f576}</UniqueIdentifier>
-    </Filter>
     <Filter Include="docs">
       <UniqueIdentifier>{6b9d1b8a-3756-4e9b-b80a-3c92fd3a6271}</UniqueIdentifier>
       <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe</Extensions>
@@ -17,9 +14,6 @@
     </Filter>
     <Filter Include="cs">
       <UniqueIdentifier>{99c94d2b-a8e7-4099-a5b9-eff02aaf6a97}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="cs\enet">
-      <UniqueIdentifier>{90e1a453-5feb-4583-a0f5-6dd3820c52ab}</UniqueIdentifier>
     </Filter>
     <Filter Include="world">
       <UniqueIdentifier>{0595b04c-5cf5-4a64-bec8-40621fea61ee}</UniqueIdentifier>
@@ -44,32 +38,8 @@
     <ClInclude Include="..\src\tools.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\enet\include\enet\enet.h">
-      <Filter>headers\eneth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\enet\include\enet\list.h">
-      <Filter>headers\eneth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\enet\include\enet\memory.h">
-      <Filter>headers\eneth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\enet\include\enet\protocol.h">
-      <Filter>headers\eneth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\enet\include\enet\time.h">
-      <Filter>headers\eneth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\enet\include\enet\types.h">
-      <Filter>headers\eneth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\enet\include\enet\unix.h">
-      <Filter>headers\eneth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\enet\include\enet\utility.h">
-      <Filter>headers\eneth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\enet\include\enet\win32.h">
-      <Filter>headers\eneth</Filter>
+    <ClInclude Include="..\include\enet\enet.h">
+      <Filter>headers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -148,33 +118,6 @@
     </ClCompile>
     <ClCompile Include="..\src\serverutil.cpp">
       <Filter>cs</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\callbacks.c">
-      <Filter>cs\enet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\host.c">
-      <Filter>cs\enet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\list.c">
-      <Filter>cs\enet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\memory.c">
-      <Filter>cs\enet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\packet.c">
-      <Filter>cs\enet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\peer.c">
-      <Filter>cs\enet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\protocol.c">
-      <Filter>cs\enet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\unix.c">
-      <Filter>cs\enet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\enet\win32.c">
-      <Filter>cs\enet</Filter>
     </ClCompile>
     <ClCompile Include="..\src\editing.cpp">
       <Filter>world</Filter>

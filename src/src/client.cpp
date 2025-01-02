@@ -64,11 +64,11 @@ void connects(char *servername)
         return;
     };
 
-    clienthost = enet_host_create(NULL, 1, rate, rate);
+    clienthost = enet_host_create(NULL, 1, rate, rate, 0);
 
     if(clienthost)
     {
-        enet_host_connect(clienthost, &address, 1); 
+        enet_host_connect(clienthost, &address, 1, 0); 
         enet_host_flush(clienthost);
         connecting = lastmillis;
         connattempts = 0;
@@ -86,7 +86,7 @@ void disconnect(int onlyclean, int async)
     {
         if(!connecting && !disconnecting) 
         {
-            enet_peer_disconnect(clienthost->peers);
+            enet_peer_disconnect(clienthost->peers, 0);
             enet_host_flush(clienthost);
             disconnecting = lastmillis;
         };
